@@ -1,8 +1,0 @@
-[
-  {
-    "content": "Analyze the existing CLAUDE.md and suggest improvements based on codebase analysis",
-    "status": "completed",
-    "priority": "medium",
-    "id": "analyze_improvements"
-  }
-]
