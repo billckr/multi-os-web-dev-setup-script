@@ -99,3 +99,7 @@ deploy-repo.sh
 
 # Whitelist checker scripts
 check-whitelist*.sh
+
+# Claude and npm cache files
+.claude/
+.npm/
