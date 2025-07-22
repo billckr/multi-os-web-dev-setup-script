@@ -90,4 +90,12 @@ script-backup.zip
 *.backup
 *.bak
 *.old
-*.origcheck-whitelist*.sh
+*.orig
+
+# Deployment and credential files
+deploy-repo.sh
+*-deploy.sh
+*.credentials.sh
+
+# Whitelist checker scripts
+check-whitelist*.sh
