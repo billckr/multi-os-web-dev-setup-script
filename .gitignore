@@ -42,3 +42,37 @@ yarn.lock
 # Claude AI cache and session files
 .claude/
 .cache/
+
+# Shell configuration and history files
+.bash_history
+.bash_logout
+.bash_profile
+.bashrc
+.cshrc
+.tcshrc
+.zshrc
+.profile
+
+# Editor history and configuration
+.viminfo
+.lesshst
+.editrc
+
+# Database history files
+.mysql_history
+.psql_history
+.sqlite_history
+
+# SSH and Git configuration
+.ssh/
+.gitconfig
+
+# System and installation tracking files
+.cloud-locale-test.skip
+.installed_databases
+.my.cnf
+*.credentials
+
+# Installation and removal logs
+install-log-*.log
+removal-log-*.log
