@@ -465,6 +465,13 @@ detect_os() {
         if [[ ! $REPLY =~ ^[Yy]$ ]]; then
             print_info "Installation cancelled by user"
             log "INFO" "Installation cancelled by user"
+            
+            # Clean up install log file since installation was cancelled
+            if [[ -n "$LOG_FILE" && -f "$LOG_FILE" ]]; then
+                rm -f "$LOG_FILE" 2>/dev/null || true
+                print_info "Install log cleaned up"
+            fi
+            
             exit 0
         fi
     else
@@ -1053,39 +1060,39 @@ show_preset_installation_summary() {
     echo -e "${WHITE}                           INSTALLATION SUMMARY${NC}"
     echo -e "${BLUE}===========================================================================${NC}"
     echo ""
-    echo "Preset: $preset_name"
+    echo "   Preset: $preset_name"
     echo ""
-    echo -e "${BLUE}Setup Options:${NC}"
-    echo "  • Operating System: $OS_NAME $OS_VERSION"
-    echo "  • Package Manager: $PACKAGE_MANAGER"
-    echo "  • Web Server: $SELECTED_WEBSERVER"
+    echo -e "   ${BLUE}Setup Options:${NC}"
+    echo "     • Operating System: $OS_NAME $OS_VERSION"
+    echo "     • Package Manager: $PACKAGE_MANAGER"
+    echo "     • Web Server: $SELECTED_WEBSERVER"
     if [[ "${SELECTED_DATABASES[0]}" != "none" ]]; then
-        echo "  • Databases: ${SELECTED_DATABASES[*]}"
+        echo "     • Databases: ${SELECTED_DATABASES[*]}"
     fi
     if [[ "${SELECTED_PHP_VERSIONS[0]}" != "none" ]]; then
-        echo "  • PHP Versions: ${SELECTED_PHP_VERSIONS[*]}"
+        echo "     • PHP Versions: ${SELECTED_PHP_VERSIONS[*]}"
     fi
     if [[ "${SELECTED_PACKAGE_MANAGERS[0]}" != "none" ]]; then
-        echo "  • Package Managers: ${SELECTED_PACKAGE_MANAGERS[*]}"
+        echo "     • Package Managers: ${SELECTED_PACKAGE_MANAGERS[*]}"
     fi
     if [[ "${SELECTED_DEVELOPMENT_TOOLS[0]}" != "none" ]]; then
-        echo "  • Development Tools: ${SELECTED_DEVELOPMENT_TOOLS[*]}"
+        echo "     • Development Tools: ${SELECTED_DEVELOPMENT_TOOLS[*]}"
     fi
     if [[ -n "$USER_IP" ]]; then
-        echo "  • Firewall Whitelist IP: $USER_IP"
+        echo "     • Firewall Whitelist IP: $USER_IP"
     fi
     
     echo ""
-    echo -e "${BLUE}Components to install:${NC}"
+    echo -e "   ${BLUE}Components to install:${NC}"
     # Display webserver name with proper capitalization
     local webserver_display="$SELECTED_WEBSERVER"
     [[ "$SELECTED_WEBSERVER" == "apache" ]] && webserver_display="Apache"
     [[ "$SELECTED_WEBSERVER" == "nginx" ]] && webserver_display="Nginx"
     [[ "$SELECTED_WEBSERVER" == "none" ]] && webserver_display=""
-    [[ -n "$webserver_display" ]] && echo "  • $webserver_display web server"
+    [[ -n "$webserver_display" ]] && echo "     • $webserver_display web server"
     
     if [[ "${SELECTED_PHP_VERSIONS[0]}" != "none" ]]; then
-        echo "  • PHP ${SELECTED_PHP_VERSIONS[*]} with extensions"
+        echo "     • PHP ${SELECTED_PHP_VERSIONS[*]} with extensions"
     fi
     # Display database name with proper capitalization
     if [[ "${SELECTED_DATABASES[0]}" != "none" ]]; then
@@ -1099,10 +1106,10 @@ show_preset_installation_summary() {
             database_list="$database_list$db_display, "
         done
         database_list="${database_list%, }"  # Remove trailing comma
-        echo "  • ${database_list} database(s)"
+        echo "     • ${database_list} database(s)"
     fi
-    echo "  • Fail2ban security service"
-    echo "  • Firewall configuration"
+    echo "     • Fail2ban security service"
+    echo "     • Firewall configuration"
     
     # Show system resources concisely
     local total_ram_kb=$(grep MemTotal /proc/meminfo | awk '{print $2}')
@@ -1111,10 +1118,10 @@ show_preset_installation_summary() {
     local cpu_cores=$(nproc)
     
     echo ""
-    echo -e "${BLUE}System Resources:${NC}"
-    echo "  • CPU Cores: $cpu_cores"
-    echo "  • Total RAM: ${total_ram_gb}GB"
-    echo "  • Available Disk Space: ${available_disk_gb}GB"
+    echo -e "   ${BLUE}System Resources:${NC}"
+    echo "     • CPU Cores: $cpu_cores"
+    echo "     • Total RAM: ${total_ram_gb}GB"
+    echo "     • Available Disk Space: ${available_disk_gb}GB"
     
     echo ""
     echo ""
@@ -1139,57 +1146,57 @@ show_installation_summary() {
     echo -e "${BLUE}===========================================================================${NC}"
     echo -e "${WHITE}                           INSTALLATION SUMMARY${NC}"
     echo -e "${BLUE}===========================================================================${NC}"
-    echo -e "${BLUE}Setup Options:${NC}"
-    echo "  • Operating System: $OS_NAME $OS_VERSION"
-    echo "  • Package Manager: $PACKAGE_MANAGER"
-    echo "  • Web Server: $SELECTED_WEBSERVER"
+    echo -e "   ${BLUE}Setup Options:${NC}"
+    echo "     • Operating System: $OS_NAME $OS_VERSION"
+    echo "     • Package Manager: $PACKAGE_MANAGER"
+    echo "     • Web Server: $SELECTED_WEBSERVER"
     if [[ "${SELECTED_DATABASES[0]}" != "none" ]]; then
-        echo "  • Databases: ${SELECTED_DATABASES[*]}"
+        echo "     • Databases: ${SELECTED_DATABASES[*]}"
     else
-        echo "  • Database: none"
+        echo "     • Database: none"
     fi
     if [[ "${SELECTED_PHP_VERSIONS[0]}" != "none" ]]; then
-        echo "  • PHP Versions: ${SELECTED_PHP_VERSIONS[*]}"
+        echo "     • PHP Versions: ${SELECTED_PHP_VERSIONS[*]}"
     else
-        echo "  • PHP Versions: None (skipped)"
+        echo "     • PHP Versions: None (skipped)"
     fi
     if [[ "${SELECTED_PACKAGE_MANAGERS[0]}" != "none" ]]; then
-        echo "  • Package Managers: ${SELECTED_PACKAGE_MANAGERS[*]}"
+        echo "     • Package Managers: ${SELECTED_PACKAGE_MANAGERS[*]}"
     else
-        echo "  • Package Managers: None (skipped)"
+        echo "     • Package Managers: None (skipped)"
     fi
     if [[ "${SELECTED_DEVELOPMENT_TOOLS[0]}" != "none" ]]; then
-        echo "  • Development Tools: ${SELECTED_DEVELOPMENT_TOOLS[*]}"
+        echo "     • Development Tools: ${SELECTED_DEVELOPMENT_TOOLS[*]}"
     else
-        echo "  • Development Tools: None (skipped)"
+        echo "     • Development Tools: None (skipped)"
     fi
     
     if [[ "$CREATE_USER" == true ]]; then
-        echo "Domain: $DOMAIN_NAME"
-        echo "Username: $USERNAME"
-        echo "Home Directory: /home/$USERNAME"
+        echo "     Domain: $DOMAIN_NAME"
+        echo "     Username: $USERNAME"
+        echo "     Home Directory: /home/$USERNAME"
         if [[ "${SELECTED_PHP_VERSIONS[0]}" != "none" ]]; then
-            echo "Test Page: Hello World! PHP page will be created"
+            echo "     Test Page: Hello World! PHP page will be created"
         else
-            echo "Test Page: Basic HTML page will be created"
+            echo "     Test Page: Basic HTML page will be created"
         fi
     fi
     
     if [[ -n "$USER_IP" ]]; then
-        echo "  • Firewall Whitelist IP: $USER_IP"
+        echo "     • Firewall Whitelist IP: $USER_IP"
     fi
     
     echo ""
-    echo -e "${BLUE}Components to install:${NC}"
+    echo -e "   ${BLUE}Components to install:${NC}"
     # Display webserver name with proper capitalization
     local webserver_display="$SELECTED_WEBSERVER"
     [[ "$SELECTED_WEBSERVER" == "apache" ]] && webserver_display="Apache"
     [[ "$SELECTED_WEBSERVER" == "nginx" ]] && webserver_display="Nginx"
-    echo "  • $webserver_display web server"
+    echo "     • $webserver_display web server"
     if [[ "${SELECTED_PHP_VERSIONS[0]}" != "none" ]]; then
-        echo "  • PHP ${SELECTED_PHP_VERSIONS[*]} with extensions"
+        echo "     • PHP ${SELECTED_PHP_VERSIONS[*]} with extensions"
     else
-        echo "  • PHP: None (skipped)"
+        echo "     • PHP: None (skipped)"
     fi
     # Display database name with proper capitalization
     if [[ "${SELECTED_DATABASES[0]}" != "none" ]]; then
@@ -1203,14 +1210,14 @@ show_installation_summary() {
             database_list="$database_list$db_display, "
         done
         database_list="${database_list%, }"  # Remove trailing comma
-        echo "  • ${database_list} database(s)"
+        echo "     • ${database_list} database(s)"
     fi
-    echo "  • Fail2ban security service"
-    echo "  • Firewall configuration"
+    echo "     • Fail2ban security service"
+    echo "     • Firewall configuration"
     
     if [[ "$CREATE_USER" == true ]]; then
-        echo "  • User account: $USERNAME"
-        echo "  • Virtual host for: $DOMAIN_NAME"
+        echo "     • User account: $USERNAME"
+        echo "     • Virtual host for: $DOMAIN_NAME"
     fi
     
     
