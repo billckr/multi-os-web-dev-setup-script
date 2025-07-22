@@ -1,0 +1,20 @@
+[
+  {
+    "content": "Review and fix Nginx-PHP default installation to use socket (not TCP)",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Ensure PHP-FPM socket configuration is properly applied",
+    "status": "completed",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Fix current 502 error with socket configuration",
+    "status": "completed",
+    "priority": "high",
+    "id": "3"
+  }
+]

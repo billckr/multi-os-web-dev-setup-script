@@ -1,0 +1,26 @@
+[
+  {
+    "content": "Examine current preset system implementation in setup.sh",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Locate and understand the installation summary display function",
+    "status": "completed",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Modify preset handling to show concise installation summary only",
+    "status": "completed",
+    "priority": "medium",
+    "id": "3"
+  },
+  {
+    "content": "Test the preset installation summary display",
+    "status": "completed",
+    "priority": "medium",
+    "id": "4"
+  }
+]

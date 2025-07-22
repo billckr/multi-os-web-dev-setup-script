@@ -1,0 +1,26 @@
+[
+  {
+    "content": "Add function to check if Claude AI Code was installed during setup",
+    "status": "completed",
+    "priority": "high",
+    "id": "check-claude-installed"
+  },
+  {
+    "content": "Modify remove_package_managers to preserve Node.js and npm if Claude AI Code is installed",
+    "status": "completed",
+    "priority": "high",
+    "id": "preserve-node-npm"
+  },
+  {
+    "content": "Update removal summary to mention Claude AI Code and dependencies remain",
+    "status": "completed",
+    "priority": "medium",
+    "id": "update-summary"
+  },
+  {
+    "content": "Test syntax after all changes",
+    "status": "completed",
+    "priority": "medium",
+    "id": "test-syntax"
+  }
+]

@@ -1,0 +1,26 @@
+[
+  {
+    "content": "Analyze current Claude Code preservation logic in --remove",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Evaluate --skip-claude flag approach vs alternatives",
+    "status": "completed",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Design and implement best solution for Claude Code protection",
+    "status": "completed",
+    "priority": "medium",
+    "id": "3"
+  },
+  {
+    "content": "Test removal scenarios to ensure Claude Code safety",
+    "status": "completed",
+    "priority": "low",
+    "id": "4"
+  }
+]

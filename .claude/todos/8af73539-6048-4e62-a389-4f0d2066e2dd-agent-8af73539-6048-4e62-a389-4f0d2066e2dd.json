@@ -1,0 +1,20 @@
+[
+  {
+    "content": "Add 'None' option to Web Server Selection",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Change 'None (Skip database installation)' to just 'None' with orange color",
+    "status": "completed",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Add blue colored dashed underlines to all section headers",
+    "status": "completed",
+    "priority": "high",
+    "id": "3"
+  }
+]

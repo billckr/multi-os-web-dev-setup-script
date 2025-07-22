@@ -1,0 +1,31 @@
+# Log files
+*.log
+install-log-*.log
+removal-log-*.log
+
+# Temporary files
+*.tmp
+*.swp
+*.swo
+*~
+
+# System files
+.DS_Store
+Thumbs.db
+
+# IDE/Editor files
+.vscode/
+.idea/
+*.sublime-*
+
+# Backup files
+*.bak
+*.backup
+
+# Configuration files with sensitive data
+.my.cnf
+*.credentials
+
+# Test files
+test_*
+*.test

@@ -1,0 +1,26 @@
+[
+  {
+    "content": "Find the choose_development_tools function",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Add Claude AI option to development tools selection",
+    "status": "completed",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Create install_claude_ai function",
+    "status": "completed",
+    "priority": "high",
+    "id": "3"
+  },
+  {
+    "content": "Update validation and removal functions for Claude AI",
+    "status": "completed",
+    "priority": "high",
+    "id": "4"
+  }
+]
