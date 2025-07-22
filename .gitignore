@@ -76,3 +76,18 @@ yarn.lock
 # Installation and removal logs
 install-log-*.log
 removal-log-*.log
+
+# Development and testing files
+test.sh
+todo.txt
+*.test.sh
+
+# Backup and archive files
+*-backup/
+*-back-*
+script-backup/
+script-backup.zip
+*.backup
+*.bak
+*.old
+*.orig
