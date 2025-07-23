@@ -4339,7 +4339,6 @@ remove_installation() {
     echo -e "${WHITE}                REMOVAL COMPLETED SUCCESSFULLY${NC}"
     echo -e "${BLUE}====================================================================${NC}"
     echo ""
-    echo ""
     echo "  • Repositories cleaned up successfully"
     echo "  • Firewall rules cleaned up"
     if [[ "$cleanup_count" -gt 0 ]]; then
