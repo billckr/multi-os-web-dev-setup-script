@@ -68,6 +68,51 @@ This repository contains a comprehensive multi-OS web development environment se
 - Database tracking: `cat /root/.installed_databases` (should list selected databases)
 - Bash cache issues: `hash -r` to clear command cache if commands show "not found" after installation
 
+## UI Formatting Standards
+
+### **Command and Path Color Standards**
+The script maintains consistent professional formatting with standardized color usage:
+
+**Required Light Grey Elements:**
+- **Shell commands**: `sudo ./setup.sh`, `hash -r`, `claude --help`, etc.
+- **File paths**: Log file paths, configuration files, any file system paths
+- **Command-line options**: All CLI flags and arguments in help text (`--remove`, `--preset=lamp`, `--database=mysql,postgresql`, etc.)
+
+**Required Blue Elements:**
+- **Section headers**: All major section dividers and titles
+- **Separator lines**: All `==========` separator bars throughout the script
+
+**Required Yellow Elements:**
+- **Warning messages**: All `[WARNING]` prefixed messages with 3-space indentation
+
+**Required Purple Elements:**
+- **Tip messages**: All `[TIP]` prefixed messages with 3-space indentation
+
+### **Warning Message Format Standards**
+Claude AI Code warnings during removal follow this exact format:
+```
+   [WARNING] Claude AI Code is currently installed and may be in use!
+
+   [WARNING] Removing it while developing could break your session!
+
+   [WARNING] DETECTED: Claude AI Code processes are currently running!
+
+===========================================================================
+
+Do you want to remove Claude AI Code? (y/N):
+```
+
+**Key formatting requirements:**
+- 3-space indentation for all warning messages
+- Line breaks after each warning for visual separation
+- Blue separator line (75 equals signs) after warning block
+- Single line break after separator before prompt
+
+### **Echo Statement Requirements**
+- All echo statements containing color codes MUST use the `-e` flag
+- Example: `echo -e "${LIGHT_GREY}sudo ./setup.sh${NC}"` (correct)
+- Never: `echo "${LIGHT_GREY}sudo ./setup.sh${NC}"` (displays raw escape sequences)
+
 ## Key Files
 
 - `setup.sh` - **Production-ready** installation script with security hardening and multi-version PHP support

@@ -62,8 +62,14 @@
 - PHP-FPM service names - Lines 1860-1870
 
 ### Text Formatting
+- `print_warning()` - Line 90 (3-space indented yellow warnings)
+- `print_tip()` - Line 95 (3-space indented purple tips)
+- `print_success()` - Line 85 (green success messages)
+- `print_info()` - Line 80 (standard info messages)
+- `print_error()` - Line 75 (red error messages)
 - Resource usage headers - Lines 488, 495
 - Log message formatting - Line 4998
+- Echo statements with color codes require `-e` flag
 
 ## Configuration Files Created
 - Apache: varies by OS
