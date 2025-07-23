@@ -130,6 +130,14 @@ sudo ./setup.sh --non-interactive --remove
 - **Input Validation**: Comprehensive sanitization and validation
 - **Secure File Operations**: Protected credential storage
 
+### Essential System Tools (Always Installed)
+These networking and monitoring tools are automatically installed and verified:
+- **curl**: Command-line tool for transferring data with URLs
+- **wget**: Command-line tool for downloading files from web servers
+- **net-tools**: Collection of networking utilities (netstat, ifconfig, etc.)
+- **netcat**: Network utility for reading/writing network connections
+- **atop**: Advanced system and process monitor for performance analysis
+
 ### Dependency Management
 - **Intelligent Checking**: Automatic dependency validation during component selection
 - **Inline Resolution**: Prompts user to resolve dependencies without restarting

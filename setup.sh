@@ -274,7 +274,13 @@ welcome_user() {
     echo "     • Multi-OS support (RHEL, Debian, SUSE, Arch families)"
     echo "     • Automatic OS detection and package manager selection"
     echo "     • Concise logging (errors/warnings only by default)"
-    echo "     • Easy removal with --remove flag"
+    echo ""
+    echo -e "   ${BLUE}Automatically installed tools:${NC}"
+    echo "     • curl - Data transfer with URLs"
+    echo "     • wget - File downloading from web servers"
+    echo "     • net-tools - (netstat, ifconfig, etc.)"
+    echo "     • netcat - Network connection utility"
+    echo "     • atop - Advanced system and process monitor"
     echo ""
     echo -e "   ${BLUE}Usage:${NC}"
     echo "     sudo $0              # Normal installation"
@@ -289,14 +295,14 @@ welcome_user() {
         print_info "Verbose logging enabled"
     else
         echo -e "   ${BLUE}System Settings:${NC}"
-        echo -e "   Install log: ${BLUE}$LOG_FILE${NC}"
+        echo -e "     Install log: ${BLUE}$LOG_FILE${NC}"
     fi
 }
 
 # Check if running as root
 check_root() {
     if [[ $EUID -eq 0 ]]; then
-        echo -e "   Running as ${BLUE}root${NC}"
+        echo -e "     Running as ${BLUE}root${NC}"
         log "INFO" "Script running as root user"
     else
         # Script not running as root - check if we can auto-detect SSH IP and re-exec with sudo
@@ -463,8 +469,8 @@ detect_os() {
         exit 1
     fi
     
-    echo -e "   Detected OS: ${BLUE}$os_name $os_version${NC}"
-    echo -e "   Package Manager: ${BLUE}$package_manager${NC}"
+    echo -e "     Detected OS: ${BLUE}$os_name $os_version${NC}"
+    echo -e "     Package Manager: ${BLUE}$package_manager${NC}"
     
     echo ""
     echo -e "${BLUE}===========================================================================${NC}"
@@ -1305,31 +1311,101 @@ update_system() {
     case "$PACKAGE_MANAGER" in
         dnf)
             if run_with_spinner "Updating system packages" dnf upgrade -y >/dev/null 2>&1; then
-                run_with_spinner "Installing essential tools" dnf install -y curl wget net-tools >/dev/null 2>&1
+                if run_with_spinner "Installing essential tools" dnf install -y curl wget net-tools nmap-ncat atop >/dev/null 2>&1; then
+                    print_success "Essential tools installed: curl, wget, net-tools, netcat, atop"
+                    log "SUCCESS" "Essential tools installed successfully (dnf)"
+                    # Verify installations
+                    for tool in curl wget netstat nc atop; do
+                        if command -v "$tool" >/dev/null 2>&1; then
+                            log "INFO" "Verified: $tool is available"
+                        else
+                            log "WARNING" "Essential tool not found: $tool"
+                        fi
+                    done
+                else
+                    print_error "Failed to install essential tools"
+                    log "ERROR" "Essential tools installation failed (dnf)"
+                fi
             fi
             ;;
         yum)
             if run_with_spinner "Updating system packages" yum update -y >/dev/null 2>&1; then
-                run_with_spinner "Installing essential tools" yum install -y curl wget net-tools >/dev/null 2>&1
+                if run_with_spinner "Installing essential tools" yum install -y curl wget net-tools nmap-ncat atop >/dev/null 2>&1; then
+                    print_success "Essential tools installed: curl, wget, net-tools, netcat, atop"
+                    log "SUCCESS" "Essential tools installed successfully (yum)"
+                    # Verify installations
+                    for tool in curl wget netstat nc atop; do
+                        if command -v "$tool" >/dev/null 2>&1; then
+                            log "INFO" "Verified: $tool is available"
+                        else
+                            log "WARNING" "Essential tool not found: $tool"
+                        fi
+                    done
+                else
+                    print_error "Failed to install essential tools"
+                    log "ERROR" "Essential tools installation failed (yum)"
+                fi
             fi
             ;;
         apt)
             if run_with_spinner "Updating package lists" apt-get update >/dev/null 2>&1; then
                 if run_with_spinner "Upgrading system packages" apt-get upgrade -y >/dev/null 2>&1; then
-                    run_with_spinner "Installing essential tools" apt-get install -y curl wget net-tools >/dev/null 2>&1
+                    if run_with_spinner "Installing essential tools" apt-get install -y curl wget net-tools netcat-openbsd atop >/dev/null 2>&1; then
+                        print_success "Essential tools installed: curl, wget, net-tools, netcat, atop"
+                        log "SUCCESS" "Essential tools installed successfully (apt)"
+                        # Verify installations
+                        for tool in curl wget netstat nc atop; do
+                            if command -v "$tool" >/dev/null 2>&1; then
+                                log "INFO" "Verified: $tool is available"
+                            else
+                                log "WARNING" "Essential tool not found: $tool"
+                            fi
+                        done
+                    else
+                        print_error "Failed to install essential tools"
+                        log "ERROR" "Essential tools installation failed (apt)"
+                    fi
                 fi
             fi
             ;;
         zypper)
             if run_with_spinner "Refreshing repositories" zypper refresh >/dev/null 2>&1; then
                 if run_with_spinner "Upgrading system packages" zypper dist-upgrade -y >/dev/null 2>&1; then
-                    run_with_spinner "Installing essential tools" zypper install -y curl wget net-tools >/dev/null 2>&1
+                    if run_with_spinner "Installing essential tools" zypper install -y curl wget net-tools netcat-openbsd atop >/dev/null 2>&1; then
+                        print_success "Essential tools installed: curl, wget, net-tools, netcat, atop"
+                        log "SUCCESS" "Essential tools installed successfully (zypper)"
+                        # Verify installations
+                        for tool in curl wget netstat nc atop; do
+                            if command -v "$tool" >/dev/null 2>&1; then
+                                log "INFO" "Verified: $tool is available"
+                            else
+                                log "WARNING" "Essential tool not found: $tool"
+                            fi
+                        done
+                    else
+                        print_error "Failed to install essential tools"
+                        log "ERROR" "Essential tools installation failed (zypper)"
+                    fi
                 fi
             fi
             ;;
         pacman)
             if run_with_spinner "Updating system packages" pacman -Syu --noconfirm >/dev/null 2>&1; then
-                run_with_spinner "Installing essential tools" pacman -S --noconfirm curl wget net-tools >/dev/null 2>&1
+                if run_with_spinner "Installing essential tools" pacman -S --noconfirm curl wget net-tools gnu-netcat atop >/dev/null 2>&1; then
+                    print_success "Essential tools installed: curl, wget, net-tools, netcat, atop"
+                    log "SUCCESS" "Essential tools installed successfully (pacman)"
+                    # Verify installations
+                    for tool in curl wget netstat nc atop; do
+                        if command -v "$tool" >/dev/null 2>&1; then
+                            log "INFO" "Verified: $tool is available"
+                        else
+                            log "WARNING" "Essential tool not found: $tool"
+                        fi
+                    done
+                else
+                    print_error "Failed to install essential tools"
+                    log "ERROR" "Essential tools installation failed (pacman)"
+                fi
             fi
             ;;
     esac

@@ -263,6 +263,15 @@ systemctl status httpd nginx mysql mariadb fail2ban
 - **Firewall Configuration**: OS-appropriate firewall setup (firewalld/ufw)
 - **Service Hardening**: Secure database initialization with random passwords
 
+### Essential System Tools (Always Installed)
+These tools are automatically installed during system updates and are not optional:
+- **curl**: Command-line tool for transferring data with URLs
+- **wget**: Command-line tool for downloading files from web servers  
+- **net-tools**: Collection of networking utilities (netstat, ifconfig, etc.)
+- **netcat**: Network utility for reading/writing network connections (nmap-ncat/netcat-openbsd/gnu-netcat depending on OS)
+- **atop**: Advanced system and process monitor for performance analysis
+- **Verification**: All tools are tested after installation with automatic logging of success/failure
+
 ## Development Notes
 
 ### UI Formatting Standards
