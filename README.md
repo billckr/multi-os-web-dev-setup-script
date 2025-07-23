@@ -1,4 +1,4 @@
-# Multi-OS Web Development Environment Setup
+# Multi-OS Web Stack Builder Setup
 
 A comprehensive, security-hardened bash script for installing complete web development stacks across multiple Linux distributions.
 

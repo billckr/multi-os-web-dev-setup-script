@@ -368,7 +368,7 @@ See `SECURITY-IMPROVEMENTS.md` for comprehensive security analysis and fix detai
 
 ### Improved Help System (2025-07-21)
 - **Enhanced --help**: Added script description and blue color-coded section headings
-- **Description**: Shows "Multi-OS Web Development Environment Setup" title at top
+- **Description**: Shows "Multi-OS Web Stack Builder Setup" title at top
 - **Visual Organization**: Blue headings for Interactive Mode, Non-Interactive Mode, and Examples sections
 - **Better UX**: Clear section separation with proper spacing and formatting
 

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Multi-OS Web Development Environment - Ver 0.9
+# Multi-OS Web Stack Builder - Ver 0.9
 # Version: 1.0
 # Description: Bulletproof installation script for web development stack
 # Supports: RHEL-based, Debian-based, SUSE-based, and Arch-based distributions
@@ -88,7 +88,7 @@ print_success() {
 }
 
 print_warning() {
-    echo -e "   ${YELLOW}[WARNING]${NC} $1"
+    echo -e "${YELLOW}[WARNING]${NC} $1"
     log "WARNING" "$1"
 }
 
@@ -113,8 +113,18 @@ error_exit() {
     exit 1
 }
 
-# Set up error trap
+# Cleanup function for Ctrl+C
+cleanup_on_interrupt() {
+    # Clean up install log file silently when user presses Ctrl+C
+    if [[ -n "$LOG_FILE" && -f "$LOG_FILE" ]]; then
+        rm -f "$LOG_FILE" 2>/dev/null || true
+    fi
+    exit 0
+}
+
+# Set up error trap and interrupt handler
 trap 'error_exit ${LINENO} "$BASH_COMMAND"' ERR
+trap 'cleanup_on_interrupt' INT
 
 # Security validation functions
 validate_domain_name() {
@@ -248,7 +258,7 @@ run_with_spinner() {
 welcome_user() {
     clear
     echo -e "${BLUE}===========================================================================${NC}"
-    echo -e "${WHITE}              Multi-OS Web Development Environment - Ver 0.9${NC}"
+    echo -e "${WHITE}              Multi-OS Web Stack Builder - Ver 0.9${NC}"
     echo -e "${BLUE}===========================================================================${NC}"
     echo ""
     echo "   This script will install and configure a complete web development stack"
@@ -271,8 +281,6 @@ welcome_user() {
     echo "     sudo $0 --verbose    # Verbose logging"
     echo "     sudo $0 --remove     # Remove installation"
     echo ""
-    echo -e "${BLUE}===========================================================================${NC}"
-    echo ""
     
     log "COMPLETION" "Installation script started"
     log "INFO" "Script version: 1.0"
@@ -280,14 +288,15 @@ welcome_user() {
     if [[ "$VERBOSE_LOGGING" == true ]]; then
         print_info "Verbose logging enabled"
     else
-        print_info "Install log: ${BLUE}$LOG_FILE${NC}"
+        echo -e "   ${BLUE}System Settings:${NC}"
+        echo -e "   Install log: ${BLUE}$LOG_FILE${NC}"
     fi
 }
 
 # Check if running as root
 check_root() {
     if [[ $EUID -eq 0 ]]; then
-        print_info "Running as ${BLUE}root${NC}"
+        echo -e "   Running as ${BLUE}root${NC}"
         log "INFO" "Script running as root user"
     else
         # Script not running as root - check if we can auto-detect SSH IP and re-exec with sudo
@@ -454,8 +463,12 @@ detect_os() {
         exit 1
     fi
     
-    print_info "Detected OS: ${BLUE}$os_name $os_version${NC}"
-    print_info "Package Manager: ${BLUE}$package_manager${NC}"
+    echo -e "   Detected OS: ${BLUE}$os_name $os_version${NC}"
+    echo -e "   Package Manager: ${BLUE}$package_manager${NC}"
+    
+    echo ""
+    echo -e "${BLUE}===========================================================================${NC}"
+    echo ""
     
     log "INFO" "Detected OS: $os_name $os_version"
     log "INFO" "Package manager: $package_manager"
@@ -468,20 +481,25 @@ detect_os() {
     # Confirm with user (skip in non-interactive mode)
     if [[ "$SKIP_CONFIRMATION" != "true" ]]; then
         echo ""
-        echo -e "Continue installation on ${BLUE}$os_name $os_version${NC} (y/N): \c"
-        read -r
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            print_info "Installation cancelled by user"
-            log "INFO" "Installation cancelled by user"
-            
-            # Clean up install log file since installation was cancelled
-            if [[ -n "$LOG_FILE" && -f "$LOG_FILE" ]]; then
-                rm -f "$LOG_FILE" 2>/dev/null || true
-                print_info "Install log cleaned up"
-            fi
-            
-            exit 0
-        fi
+        while true; do
+            echo -e "Continue installation on ${BLUE}$os_name $os_version${NC} (y/N): \c"
+            read -r
+            case $REPLY in
+                [Yy]*)
+                    break
+                    ;;
+                [Nn]*|"")
+                    # Clean up install log file since installation was cancelled
+                    if [[ -n "$LOG_FILE" && -f "$LOG_FILE" ]]; then
+                        rm -f "$LOG_FILE" 2>/dev/null || true
+                    fi
+                    exit 0
+                    ;;
+                *)
+                    echo -e "${YELLOW}[WARNING]${NC} Invalid response. y/N required."
+                    ;;
+            esac
+        done
     else
         echo ""
         print_info "Proceeding with installation on $os_name $os_version (non-interactive mode)"
@@ -517,7 +535,7 @@ check_vpn() {
             log "INFO" "User confirmed no VPN usage"
             break
         else
-            print_error "Please enter 'y' for yes or 'n' for no (or press Enter for no)"
+            print_warning "Invalid response. y/N required."
         fi
     done
 }
@@ -650,32 +668,17 @@ show_resource_usage_for_selection() {
     local cpu_cores=$(nproc)
     
     echo ""
-    echo -e "${BLUE}System Resources:${NC}"
-    echo "  • CPU Cores: $cpu_cores"
-    echo "  • Total RAM: ${total_ram_gb}GB"
-    echo "  • Available Disk Space: ${available_disk_gb}GB"
+    echo -e "   ${BLUE}System Resources:${NC}"
+    echo "     • CPU Cores: $cpu_cores"
+    echo "     • Total RAM: ${total_ram_gb}GB"
+    echo "     • Available Disk Space: ${available_disk_gb}GB"
     
     echo ""
-    echo -e "${BLUE}Resource Requirements ${WHITE}(Based on Selected)${BLUE}:${NC}"
-    echo -e "${WHITE}Minimum Requirements (Basic LAMP/LEMP):${NC}"
-    echo "  • 1 CPU core"
-    echo "  • 1GB RAM"
-    echo "  • 5GB disk space"
-    echo "  • Components: Web server + 1 database + PHP"
-    
-    echo ""
-    echo -e "${BLUE}Recommended (${WHITE}Full Development${BLUE}):${NC}"
-    echo "  • 2+ CPU cores"
-    echo "  • 2GB+ RAM"
-    echo "  • 10GB+ disk space"
-    echo "  • Components: All web servers, multiple databases, multiple PHP versions"
-    
-    echo ""
-    echo -e "${BLUE}Heavy Development Usage:${NC}"
-    echo "  • 4+ CPU cores"
-    echo "  • 4GB+ RAM"
-    echo "  • 20GB+ disk space"
-    echo "  • Components: Multiple databases + Multiple PHP versions + All tools"
+    echo -e "   ${BLUE}Recommended Resources (Based on Selected):${NC}"
+    echo "     • 1 CPU core"
+    echo "     • 1GB RAM"
+    echo "     • 5GB disk space"
+    echo "     • Components: Web server + 1 database + PHP"
     
     echo ""
     echo ""
@@ -714,7 +717,7 @@ choose_webserver() {
                 break
                 ;;
             *)
-                print_error "Invalid choice. Please select 1-3."
+                print_warning "Invalid response. 1-3 required."
                 ;;
         esac
     done
@@ -775,7 +778,7 @@ choose_database() {
                     fi
                     ;;
                 *)
-                    print_error "Invalid selection: $c. Use 1, 2, 3, 4, or 5"
+                    print_warning "Choose databases or '5' for none:"
                     valid_selection=false
                     break
                     ;;
@@ -815,7 +818,7 @@ choose_php_versions() {
     while true; do
         read -p "Choose PHP version(s) or '4' for none: " -r php_input
         if [[ -z "$php_input" ]]; then
-            print_error "Please select at least one PHP version or 'none'"
+            print_warning "Invalid response. 1-4 required."
             continue
         fi
         
@@ -852,7 +855,7 @@ choose_php_versions() {
                     SELECTED_PHP_VERSIONS+=("8.4")
                     ;;
                 *)
-                    print_error "Invalid selection: $selection. Use 1, 2, 3, or 4 (or legacy 8.2, 8.3, 8.4, 'none')"
+                    print_warning "Invalid response. 1-4 required."
                     valid_versions=false
                     break
                     ;;
@@ -885,7 +888,7 @@ choose_php_versions() {
                         log "INFO" "User selected PHP $DEFAULT_PHP_VERSION as default version during selection"
                         break
                     else
-                        print_error "Invalid choice. Please enter a number between 1 and ${#SELECTED_PHP_VERSIONS[@]}."
+                        print_warning "Invalid response. 1-${#SELECTED_PHP_VERSIONS[@]} required."
                     fi
                 done
             else
@@ -958,7 +961,7 @@ choose_package_managers() {
                     fi
                     ;;
                 *)
-                    print_error "Invalid choice: $c. Use 1, 2, 3, or 'none'"
+                    print_warning "Choose package managers or '3' for none:"
                     valid_selection=false
                     break
                     ;;
@@ -1031,7 +1034,7 @@ choose_development_tools() {
                     fi
                     ;;
                 *)
-                    print_error "Invalid choice: $c. Use 1, 2, 3, 4, or 'none'"
+                    print_warning "Choose development tools or '4' for none:"
                     valid_selection=false
                     break
                     ;;
@@ -1154,6 +1157,7 @@ show_installation_summary() {
     echo -e "${BLUE}===========================================================================${NC}"
     echo -e "${WHITE}                           INSTALLATION SUMMARY${NC}"
     echo -e "${BLUE}===========================================================================${NC}"
+    echo ""
     echo -e "   ${BLUE}Setup Options:${NC}"
     echo "     • Operating System: $OS_NAME $OS_VERSION"
     echo "     • Package Manager: $PACKAGE_MANAGER"
@@ -4268,7 +4272,7 @@ remove_installation() {
             print_info "✅ Claude AI Code will be preserved (non-interactive mode - safety default)"
             log "INFO" "Claude AI Code preservation auto-selected in non-interactive mode for safety"
         else
-            read -p "Do you want to remove Claude AI Code? (y/N): " -r
+            read -p "   Do you want to remove Claude AI Code? (y/N): " -r
             if [[ $REPLY =~ ^[Yy]$ ]]; then
                 # If Claude is running, require additional confirmation
                 if [[ "$claude_running" == true ]]; then
@@ -4276,7 +4280,10 @@ remove_installation() {
                     print_warning "🚨 DANGER: Claude AI Code is actively running!"
                     print_warning "Removing it now WILL break your current session!"
                     echo ""
-                    read -p "Are you ABSOLUTELY SURE you want to continue? (y/N): " -r
+                    read -p "   Are you ABSOLUTELY SURE you want to continue? (y/N): " -r
+                    echo ""
+                    echo -e "${BLUE}===========================================================================${NC}"
+                    echo ""
                     if [[ $REPLY =~ ^[Yy]$ ]]; then
                         REMOVE_CLAUDE=true
                         print_info "⚠️  Claude AI Code will be removed (session will break!)"
@@ -4358,6 +4365,7 @@ remove_installation() {
     echo ""
     echo -e "  🔄 ${WHITE}Important: To clear stale command references, run:${NC} ${BLUE}hash -r${NC}"
     echo ""
+    echo -e "${BLUE}====================================================================${NC}"
     echo ""
     
     log "COMPLETION" "Removal process completed successfully"
@@ -5242,69 +5250,71 @@ main() {
                 shift
                 ;;
             --help|-h)
-                echo -e "${BLUE}Multi-OS Web Development Environment Setup${NC}"
-                echo "A comprehensive script for installing complete web development stacks"
-                echo "across RHEL, Debian, SUSE, and Arch Linux distributions with security hardening."
                 echo ""
-                echo "Usage: sudo $0 [options]"
+                echo -e "   ${BLUE}Multi-OS Web Stack Builder Setup${NC}"
                 echo ""
-                echo -e "${BLUE}Quick Preset Options:${NC}"
-                echo "  --preset=lamp         Apache + MySQL + PHP 8.3 + Composer + Git"
-                echo "  --preset=lemp         Nginx + MySQL + PHP 8.3 + Composer + Git"
-                echo "  --preset=minimal      Apache + MySQL"
-                echo "  --preset=full         Everything with sensible defaults"
-                echo "  --auto                Auto-proceed with presets (skip confirmation prompt)"
+                echo "   A comprehensive script for installing complete web development stacks"
+                echo "   across RHEL, Debian, SUSE, and Arch Linux distributions with security hardening."
                 echo ""
-                echo -e "${BLUE}Interactive Mode Options:${NC}"
-                echo "  --remove              Remove all installed components"
-                echo "  --verbose, -v         Enable verbose logging"
-                echo "  --remove --verbose    Remove with detailed logging"
-                echo "  --help, -h            Show this help message"
-                echo "  --list-options        Show all available component values for non-interactive mode"
+                echo "   Usage: sudo $0 [options]"
                 echo ""
-                echo -e "${BLUE}Non-Interactive Mode Options:${NC}"
-                echo "  --non-interactive                 Enable non-interactive mode"
-                echo "  --skip                            Skip unspecified components (default to 'none')"
-                echo "  --list-options                    Show all available component values"
-                echo "  --webserver=apache|nginx|none     Select web server"
-                echo "  --database=mysql,mariadb,postgresql,sqlite,none"
-                echo "                                    Select databases (comma-separated)"
-                echo "  --php=8.2,8.3,8.4                Select PHP versions (comma-separated, can install multiple)"
-                echo "  --php-default=8.2                 optional. If used sets default PHP version. If not, first PHP version installed is default"
-                echo "  --package-managers=composer,nodejs,none"
-                echo "                                    Select package managers (comma-separated)"
-                echo "  --dev-tools=git,github-cli,claude,none"
-                echo "                                    Select development tools (comma-separated)"
-                echo "  --domain=example.com              Domain name for virtual host"
-                echo "  --username=webuser                Username for domain setup: start with letter/underscore,"
-                echo "                                    lowercase letters/numbers/underscore/dash only, 3-32 chars, cannot be existing user"
+                echo -e "   ${BLUE}Quick Preset Options:${NC}"
+                echo "     --preset=lamp         Apache + MySQL + PHP 8.3 + Composer + Git"
+                echo "     --preset=lemp         Nginx + MySQL + PHP 8.3 + Composer + Git"
+                echo "     --preset=minimal      Apache + MySQL"
+                echo "     --preset=full         Everything with sensible defaults"
+                echo "     --auto                Auto-proceed with presets (skip confirmation prompt)"
                 echo ""
-                echo -e "${BLUE}Non-Interactive Examples:${NC}"
+                echo -e "   ${BLUE}Interactive Mode Options:${NC}"
+                echo "     --remove              Remove all installed components"
+                echo "     --verbose, -v         Enable verbose logging"
+                echo "     --remove --verbose    Remove with detailed logging"
+                echo "     --help, -h            Show this help message"
+                echo "     --list-options        Show all available component values for non-interactive mode"
                 echo ""
-                echo -e "  ${BLUE}# Quick presets (easiest way to get started)${NC}"
-                echo "  sudo $0 --preset=lamp                # Apache, PHP 8.3, MySQL, Composer, git, Fail2ban, Firewall config"
-                echo "  sudo $0 --preset=lamp --auto         # Apache, PHP 8.3, MySQL, Composer, git, Fail2ban, Firewall config - Auto-Install"
-                echo "  sudo $0 --preset=lemp                # Nginx, PHP 8.3, MySQL, Composer, git, Fail2ban, Firewall config"
-                echo "  sudo $0 --preset=minimal             # Apache, MySQL, Fail2ban, Firewall config"
+                echo -e "   ${BLUE}Non-Interactive Mode Options:${NC}"
+                echo "     --non-interactive                 Enable non-interactive mode"
+                echo "     --skip                            Skip unspecified components (default to 'none')"
+                echo "     --list-options                    Show all available component values"
+                echo "     --webserver=apache|nginx|none     Select web server"
+                echo "     --database=mysql,mariadb,postgresql,sqlite,none"
+                echo "                                       Select databases (comma-separated)"
+                echo "     --php=8.2,8.3,8.4                Select PHP versions (comma-separated, can install multiple)"
+                echo "     --php-default=8.2                 optional. If used sets default PHP version. If not, first PHP version installed is default"
+                echo "     --package-managers=composer,nodejs,none"
+                echo "                                       Select package managers (comma-separated)"
+                echo "     --dev-tools=git,github-cli,claude,none"
+                echo "                                       Select development tools (comma-separated)"
+                echo "     --domain=example.com              Domain name for virtual host"
+                echo "     --username=webuser                Username for domain setup: start with letter/underscore,"
+                echo "                                       lowercase letters/numbers/underscore/dash only, 3-32 chars, cannot be existing user"
                 echo ""
-                echo -e "  ${BLUE}# Minimal installation${NC}"
-                echo "  sudo $0 --non-interactive --webserver=nginx --skip"
+                echo -e "   ${BLUE}Non-Interactive Examples:${NC}"
                 echo ""
-                echo -e "  ${BLUE}# Single PHP version (becomes default automatically)${NC}"
-                echo "  sudo $0 --non-interactive --webserver=apache --database=mysql --php=8.2"
+                echo -e "     ${BLUE}# Quick presets (easiest way to get started)${NC}"
+                echo "     sudo $0 --preset=lamp                # Apache, PHP 8.3, MySQL, Composer, git, Fail2ban, Firewall config"
+                echo "     sudo $0 --preset=lamp --auto         # Apache, PHP 8.3, MySQL, Composer, git, Fail2ban, Firewall config - Auto-Install"
+                echo "     sudo $0 --preset=lemp                # Nginx, PHP 8.3, MySQL, Composer, git, Fail2ban, Firewall config"
+                echo "     sudo $0 --preset=minimal             # Apache, MySQL, Fail2ban, Firewall config"
                 echo ""
-                echo -e "  ${BLUE}# Multiple PHP versions, explicit default (8.3 becomes default)${NC}"
-                echo "  sudo $0 --non-interactive --webserver=nginx --database=postgresql,sqlite \\"
-                echo "    --php=8.2,8.3,8.4 --php-default=8.3"
+                echo -e "     ${BLUE}# Minimal installation${NC}"
+                echo "     sudo $0 --non-interactive --webserver=nginx --skip"
                 echo ""
-                echo -e "  ${BLUE}# Multiple PHP versions, first becomes default (8.2 becomes default)${NC}"
-                echo "  sudo $0 --non-interactive --webserver=apache --database=mysql \\"
-                echo "    --php=8.2,8.3"
+                echo -e "     ${BLUE}# Single PHP version (becomes default automatically)${NC}"
+                echo "     sudo $0 --non-interactive --webserver=apache --database=mysql --php=8.2"
                 echo ""
-                echo -e "  ${BLUE}# Development environment with domain${NC}"
-                echo "  sudo $0 --non-interactive --webserver=nginx --database=mysql --php=8.4 \\"
-                echo "    --package-managers=composer,nodejs --dev-tools=git,claude \\"
-                echo "    --domain=dev.local --username=developer"
+                echo -e "     ${BLUE}# Multiple PHP versions, explicit default (8.3 becomes default)${NC}"
+                echo "     sudo $0 --non-interactive --webserver=nginx --database=postgresql,sqlite \\"
+                echo "       --php=8.2,8.3,8.4 --php-default=8.3"
+                echo ""
+                echo -e "     ${BLUE}# Multiple PHP versions, first becomes default (8.2 becomes default)${NC}"
+                echo "     sudo $0 --non-interactive --webserver=apache --database=mysql \\"
+                echo "       --php=8.2,8.3"
+                echo ""
+                echo -e "     ${BLUE}# Development environment with domain${NC}"
+                echo "     sudo $0 --non-interactive --webserver=nginx --database=mysql --php=8.4 \\"
+                echo "       --package-managers=composer,nodejs --dev-tools=git,claude \\"
+                echo "       --domain=dev.local --username=developer"
                 echo ""
                 exit 0
                 ;;
@@ -5534,22 +5544,22 @@ main() {
         echo -e "${BLUE}===========================================================================${NC}"
         echo -e "${WHITE}                  INSTALLATION COMPLETED SUCCESSFULLY${NC}"
         echo -e "${BLUE}===========================================================================${NC}"
+        echo ""
         
         log "COMPLETION" "Installation completed successfully"
         
         if [[ "$CREATE_USER" == true ]]; then
+            echo -e "   ${LIGHT_GREY}[INFO]${NC} Domain Setup:"
+            echo "     • Domain: $DOMAIN_NAME"
+            echo "     • User: $USERNAME"
+            echo "     • Web Directory: /home/$USERNAME/public_html"
+            echo "     • Test Page: http://$DOMAIN_NAME or http://$(hostname -I | awk '{print $1}')"
             echo ""
-            print_info "Domain Setup:"
-            print_info "  • Domain: $DOMAIN_NAME"
-            print_info "  • User: $USERNAME"
-            print_info "  • Web Directory: /home/$USERNAME/public_html"
-            print_info "  • Test Page: http://$DOMAIN_NAME or http://$(hostname -I | awk '{print $1}')"
             log "COMPLETION" "Domain setup - Domain: $DOMAIN_NAME, User: $USERNAME"
         fi
         
-        echo ""
-        echo -e "${BLUE}Service Status:${NC}"
-        echo -e "${BLUE}--------------${NC}"
+        echo -e "   ${BLUE}Service Status:${NC}"
+        echo -e "   ${BLUE}--------------${NC}"
         if [[ "$SELECTED_WEBSERVER" == "apache" ]]; then
             local apache_service="httpd"
             [[ "$PACKAGE_MANAGER" == "apt" ]] && apache_service="apache2"
@@ -5778,21 +5788,15 @@ main() {
         log "INFO" "Bash command cache cleared despite validation failures"
     fi
     
-    echo ""
     log "COMPLETION" "Script execution completed"
-    print_info "Install log: $LOG_FILE"
+    echo -e "   ${LIGHT_GREY}[INFO]${NC} Install log: ${BLUE}$LOG_FILE${NC}"
+    echo -e "   ${LIGHT_GREY}[INFO]${NC} 🔄 Important: run: ${BLUE}hash -r${NC} (clears bash command cache)"
+    echo -e "   ${LIGHT_GREY}[INFO]${NC} Note: Only errors, warnings, and completion messages were logged."
+    echo -e "   ${LIGHT_GREY}[INFO]${NC} Use '${BLUE}$0 --verbose${NC}' for detailed installation logs."
     
-    # Inform user about bash cache clearing requirement
     echo ""
-    print_info "🔄 Important: To access newly installed commands immediately, run:"
-    echo -e "   ${BLUE}hash -r${NC}   ${WHITE}(clears bash command cache)${NC}"
+    echo -e "${BLUE}===========================================================================${NC}"
     echo ""
-    
-    if [[ "$VERBOSE_LOGGING" != true ]]; then
-        echo ""
-        print_info "Note: Only errors, warnings, and completion messages were logged."
-        print_info "Use '$0 --verbose' for detailed installation logs."
-    fi
 }
 
 # Run main function

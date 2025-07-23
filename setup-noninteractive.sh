@@ -356,7 +356,7 @@ safe_welcome_user() {
         # In non-interactive mode, show banner but skip confirmation
         echo -e "\033[H\033[2J\033[3J"
         echo -e "${BLUE}===========================================================================${NC}"
-        echo -e "${WHITE}              Multi-OS Web Development Environment - Ver 0.9${NC}"
+        echo -e "${WHITE}              Multi-OS Web Stack Builder - Ver 0.9${NC}"
         echo -e "${BLUE}===========================================================================${NC}"
         echo ""
         echo "This script will install and configure a complete web development stack"
