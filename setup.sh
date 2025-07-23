@@ -4259,6 +4259,9 @@ remove_installation() {
             echo ""
         fi
         
+        echo "==========================================================================="
+        echo ""
+        
         if [[ "$NON_INTERACTIVE" == "true" ]]; then
             # In non-interactive mode, skip Claude removal for safety
             REMOVE_CLAUDE=false
