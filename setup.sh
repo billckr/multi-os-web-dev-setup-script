@@ -4247,7 +4247,9 @@ remove_installation() {
     if command -v claude >/dev/null 2>&1; then
         echo ""
         print_warning "Claude AI Code is currently installed and may be in use!"
+        echo ""
         print_warning "Removing it while developing could break your session!"
+        echo ""
         
         # Check if Claude Code is actively running
         local claude_running=false
