@@ -88,7 +88,7 @@ print_success() {
 }
 
 print_warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1"
+    echo -e "   ${YELLOW}[WARNING]${NC} $1"
     log "WARNING" "$1"
 }
 
@@ -4247,15 +4247,13 @@ remove_installation() {
     if command -v claude >/dev/null 2>&1; then
         echo ""
         print_warning "Claude AI Code is currently installed and may be in use!"
-        print_warning "Removing it while developing IN Claude Code could break your session!"
-        echo ""
+        print_warning "Removing it while developing could break your session!"
         
         # Check if Claude Code is actively running
         local claude_running=false
         if pgrep -f "claude" >/dev/null 2>&1; then
             claude_running=true
-            print_warning "⚠️  DETECTED: Claude AI Code processes are currently running!"
-            echo ""
+            print_warning "DETECTED: Claude AI Code processes are currently running!"
         fi
         
         if [[ "$NON_INTERACTIVE" == "true" ]]; then
