@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Multi-OS Web Stack Builder - Ver 0.9
+# Multi-OS Web Stack Builder
 # Version: 1.0
 # Description: Bulletproof installation script for web development stack
 # Supports: RHEL-based, Debian-based, SUSE-based, and Arch-based distributions
@@ -258,7 +258,7 @@ run_with_spinner() {
 welcome_user() {
     clear
     echo -e "${BLUE}===========================================================================${NC}"
-    echo -e "${WHITE}              Multi-OS Web Stack Builder - Ver 0.9${NC}"
+    echo -e "${WHITE}                        Multi-OS Web Stack Builder${NC}"
     echo -e "${BLUE}===========================================================================${NC}"
     echo ""
     echo "   This script will install and configure a complete web development stack"
@@ -740,7 +740,7 @@ choose_database() {
     echo "4. SQLite3"
     echo "5. None"
     echo "For multiple use spaces (1 2 3):"
-    echo -e "${YELLOW}Note: MySQL and MariaDB cannot be installed together${NC}"
+    echo -e "${PURPLE}[TIP]${NC} ${WHITE}MySQL and MariaDB cannot be installed together${NC}"
     
     SELECTED_DATABASES=()
     
