@@ -45,6 +45,7 @@ BLUE='\033[1;34m'
 ORANGE='\033[0;33m'
 WHITE='\033[1;37m'
 LIGHT_GREY='\033[0;37m'
+PURPLE='\033[1;35m'
 NC='\033[0m' # No Color
 
 # Logging function
@@ -89,6 +90,13 @@ print_success() {
 print_warning() {
     echo -e "${YELLOW}[WARNING]${NC} $1"
     log "WARNING" "$1"
+}
+
+print_tip() {
+    echo -e "   ${PURPLE}[TIP]${NC} $1"
+    if [[ "$VERBOSE_LOGGING" == true ]]; then
+        log "INFO" "TIP: $1"
+    fi
 }
 
 print_error() {
@@ -243,25 +251,25 @@ welcome_user() {
     echo -e "${WHITE}              Multi-OS Web Development Environment - Ver 0.9${NC}"
     echo -e "${BLUE}===========================================================================${NC}"
     echo ""
-    echo "This script will install and configure a complete web development stack"
-    echo "including web server, PHP, database, and security tools."
+    echo "   This script will install and configure a complete web development stack"
+    echo "   including web server, PHP, database, and security tools."
     echo ""
-    echo -e "${BLUE}Supported Components:${NC}"
-    echo "  • Web Servers: Apache or Nginx"
-    echo "  • PHP: Versions 8.2, 8.3, 8.4 (one or more)"
-    echo "  • Databases: MySQL, MariaDB, PostgreSQL, SQLite3, MongoDB, Redis"
-    echo "  • Security: Fail2ban with automatic IP whitelisting"
+    echo -e "   ${BLUE}Supported Components:${NC}"
+    echo "     • Web Servers: Apache or Nginx"
+    echo "     • PHP: Versions 8.2, 8.3, 8.4 (one or more)"
+    echo "     • Databases: MySQL, MariaDB, PostgreSQL, SQLite3, MongoDB, Redis"
+    echo "     • Security: Fail2ban with automatic IP whitelisting"
     echo ""
-    echo -e "${BLUE}Features:${NC}"
-    echo "  • Multi-OS support (RHEL, Debian, SUSE, Arch families)"
-    echo "  • Automatic OS detection and package manager selection"
-    echo "  • Concise logging (errors/warnings only by default)"
-    echo "  • Easy removal with --remove flag"
+    echo -e "   ${BLUE}Features:${NC}"
+    echo "     • Multi-OS support (RHEL, Debian, SUSE, Arch families)"
+    echo "     • Automatic OS detection and package manager selection"
+    echo "     • Concise logging (errors/warnings only by default)"
+    echo "     • Easy removal with --remove flag"
     echo ""
-    echo -e "${BLUE}Usage:${NC}"
-    echo "  sudo $0              # Normal installation"
-    echo "  sudo $0 --verbose    # Verbose logging"
-    echo "  sudo $0 --remove     # Remove installation"
+    echo -e "   ${BLUE}Usage:${NC}"
+    echo "     sudo $0              # Normal installation"
+    echo "     sudo $0 --verbose    # Verbose logging"
+    echo "     sudo $0 --remove     # Remove installation"
     echo ""
     echo -e "${BLUE}===========================================================================${NC}"
     echo ""
@@ -4182,24 +4190,29 @@ run_validations() {
 
 # Removal function
 remove_installation() {
-    echo -e "${BLUE}===========================================================================${NC}"
-    echo -e "${WHITE}                        REMOVAL MODE${NC}"
-    echo -e "${BLUE}===========================================================================${NC}"
-    echo "This will remove all components installed by this script."
-    echo ""
-    
-    # Show verbose option if not already enabled
-    if [[ "$VERBOSE_LOGGING" != true ]]; then
-        print_info "Tip: Use './setup.sh --verbose --remove' for detailed removal logs."
-        echo ""
-    fi
-    
     # Create removal log file FIRST
     # Clean up old removal log files before creating new one
     rm -f "${SCRIPT_DIR}"/removal-log-*.log 2>/dev/null || true
     REMOVAL_LOG_FILE="${SCRIPT_DIR}/removal-log-$(date +%Y%m%d-%H%M%S).log"
     LOG_FILE="$REMOVAL_LOG_FILE"  # Redirect logging to removal log
     touch "$REMOVAL_LOG_FILE"  # Create the removal log file
+    
+    echo -e "${BLUE}===========================================================================${NC}"
+    echo -e "${WHITE}                        PACKAGE UNINSTALL MODE${NC}"
+    echo -e "${BLUE}===========================================================================${NC}"
+    echo ""
+    echo ""
+    echo "   This will remove all components installed by this script."
+    echo ""
+    echo -e "   ${LIGHT_GREY}[INFO]${NC} Uninstall log: ${LIGHT_GREY}$REMOVAL_LOG_FILE${NC}"
+    echo ""
+    
+    # Show verbose option if not already enabled
+    if [[ "$VERBOSE_LOGGING" != true ]]; then
+        print_tip "Use '${LIGHT_GREY}./setup.sh --verbose --remove${NC}' for detailed removal logs."
+        echo ""
+        echo ""
+    fi
     
     # Initialize required variables for removal
     detect_os_for_removal
@@ -4208,13 +4221,24 @@ remove_installation() {
     
     # Skip confirmation in non-interactive mode
     if [[ "$NON_INTERACTIVE" == "true" ]]; then
-        print_info "Auto-proceeding with removal (non-interactive mode)"
+        print_info "   Auto-proceeding with removal (non-interactive mode)"
         log "INFO" "Auto-proceeding with removal (non-interactive mode)"
+        echo ""
+        echo -e "${BLUE}===========================================================================${NC}"
+        echo ""
     else
-        read -p "Are you sure you want to remove all installed components? (y/N): " -r
+        echo -e "${BLUE}===========================================================================${NC}"
+        echo ""
+        read -p "   Are you sure you want to remove all installed components? (y/N): " -r
         if [[ ! $REPLY =~ ^[Yy]$ ]]; then
             print_info "Removal cancelled"
             log "INFO" "Removal cancelled by user"
+            
+            # Clean up empty removal log file since removal was cancelled
+            if [[ -n "$REMOVAL_LOG_FILE" && -f "$REMOVAL_LOG_FILE" ]]; then
+                rm -f "$REMOVAL_LOG_FILE" 2>/dev/null || true
+            fi
+            
             exit 0
         fi
     fi

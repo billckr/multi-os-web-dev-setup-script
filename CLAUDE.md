@@ -41,6 +41,11 @@ This repository contains a comprehensive multi-OS web development environment se
    - **Fix Applied**: Now defaults to Unix socket (/run/php-fpm/www.sock) with intelligent TCP fallback
    - **Benefit**: Better security, 10-30% performance improvement, simpler configuration
 
+5. **✅ UI Formatting Standardization (NEW)**: Applied consistent 3-space indentation to all banner content
+   - **Issue**: Welcome banner and installation summary had inconsistent left-aligned formatting
+   - **Fix Applied**: Standardized 3-space indentation for section headers and 5-space for content items
+   - **Benefit**: Professional, uniform appearance throughout the script interface
+
 ### **Key Architecture Changes Made:**
 - **Preset System**: Added four preset configurations (lamp, lemp, minimal, full) for quick installation
 - **Early Error Detection**: "Nothing to install" scenarios now show immediate helpful suggestions
@@ -214,6 +219,24 @@ systemctl status httpd nginx mysql mariadb fail2ban
 - **Service Hardening**: Secure database initialization with random passwords
 
 ## Development Notes
+
+### UI Formatting Standards
+**Banner and Summary Display Formatting (Established 2025-07-22)**
+
+All banner content and user-facing summaries should follow this consistent formatting pattern:
+
+**Indentation Rules:**
+- **Section Headers**: 3-space indentation (`   Supported Components:`)
+- **Content Items**: 5-space indentation (`     • Web Servers: Apache or Nginx`)
+- **Description Text**: 3-space indentation (`   This script will install...`)
+
+**Applied To:**
+- `welcome_user()` function - Welcome banner display
+- `show_installation_summary()` - Regular installation summary
+- `show_preset_installation_summary()` - Preset installation summary
+
+**Future Banner Content:**
+Any new banner, summary, or formatted display content should follow this same 3/5-space indentation pattern for visual consistency and professional appearance.
 
 ### Script Design Principles
 - **Strict Error Handling**: `set -euo pipefail` with comprehensive error trapping
