@@ -246,10 +246,19 @@ systemctl status httpd nginx mysql mariadb fail2ban
 - **Nginx**: Unified configuration with PHP-FPM integration
 
 ### Databases
-- **MySQL/MariaDB**: Automatic initialization and security hardening
-- **PostgreSQL**: Development user setup with sample database
+- **MySQL**: Enhanced installation with OS-specific authentication, pre-installation cleanup, and comprehensive error diagnosis
+- **MariaDB**: Improved security setup with multiple authentication methods, automatic remnant cleanup, and detailed debugging
+- **PostgreSQL**: Robust installation with version-aware cleanup, OS-specific user creation, and enhanced error handling
 - **SQLite**: Lightweight option with sample database creation
 - **MongoDB/Redis**: NoSQL and caching options
+
+#### Database Installation Improvements (2025-07-23)
+**Enhanced Security & Reliability**: All database installations now include:
+- **Pre-Installation Cleanup**: Automatically stops conflicting services and removes corrupted data directories
+- **OS-Specific Authentication**: Uses appropriate authentication methods for each package manager (dnf/yum, apt, zypper, pacman)
+- **Comprehensive Removal**: Enhanced removal process cleans up data directories, configuration files, socket files, and logs
+- **Better Error Diagnosis**: Detailed service status checking and specific error reporting when installations fail
+- **Dirty System Handling**: Safely handles partial previous installations and configuration conflicts
 
 ### PHP Stack
 - **Multi-Version Support**: PHP 8.2, 8.3, 8.4 with simultaneous installation capability
@@ -354,6 +363,24 @@ validate_file_path()       # Path traversal protection
 See `SECURITY-IMPROVEMENTS.md` for comprehensive security analysis and fix details.
 
 ## Recent Improvements
+
+### Database Installation Enhancements (2025-07-23)
+- **Comprehensive Database Cleanup**: Enhanced removal process for MySQL, MariaDB, and PostgreSQL
+  - Stops all possible service names (mysql, mysqld, mariadb, postgresql-*)
+  - Removes data directories, configuration files, socket files, and log files
+  - Prevents conflicts from partial previous installations
+- **Pre-Installation Cleanup**: Automatically cleans up corrupted/empty data directories before installation
+  - Safely detects and removes invalid database directories
+  - Only removes directories without valid database structures
+- **OS-Specific Authentication**: Database security setup now uses appropriate methods for each OS
+  - **RHEL/AlmaLinux/Rocky**: Passwordless authentication with sudo fallback
+  - **Debian/Ubuntu**: Sudo authentication with passwordless fallback  
+  - **openSUSE**: Passwordless authentication
+  - **Arch Linux**: Passwordless authentication
+- **Enhanced Error Diagnosis**: Comprehensive debugging when database setup fails
+  - Service status checking with detailed output
+  - Specific error reporting for authentication vs service failures
+  - Proper logging for troubleshooting "dirty system" scenarios
 
 ### Non-Interactive Mode with --skip Flag (2025-07-21)
 - **New Feature**: Added `setup-noninteractive.sh` with complete non-interactive installation support

@@ -21,11 +21,23 @@
 - `show_noninteractive_status()` - Line 381
 
 ### Installation Functions
-- `install_mysql()` - Line 1178
-- `install_php()` - Line 1603
-- `configure_apache_php()` - Line 1817
-- `configure_nginx_php()` - Line 1854
-- `set_default_php_version()` - Line 1789
+- `install_mysql()` - Line 1561 (Enhanced with pre-cleanup and OS-specific authentication)
+- `install_mariadb()` - Line 1663 (Enhanced with pre-cleanup and OS-specific authentication)
+- `install_postgresql()` - Line 2022 (Enhanced with pre-cleanup and OS-specific user creation)
+- `install_php()` - Line 2107
+- `configure_apache_php()` - Line 2322
+- `configure_nginx_php()` - Line 2360
+- `set_default_php_version()` - Line 2289
+
+### Database Security Functions
+- `secure_mysql_installation()` - Line 1643 (OS-specific authentication with comprehensive error handling)
+- `secure_mariadb_installation()` - Line 1728 (OS-specific authentication with comprehensive error handling)
+- `setup_postgresql_dev_user()` - Line 2109 (OS-specific user creation with comprehensive error handling)
+
+### Database Removal Functions
+- `remove_mysql_data()` - Line 5182 (Enhanced cleanup: services, data, configs, sockets, logs)
+- `remove_mariadb_data()` - Line 5207 (Enhanced cleanup: services, data, configs, sockets, logs)
+- `remove_postgresql_data()` - Line 5397 (Enhanced cleanup: services, data, configs, sockets, logs)
 
 ### Package Management Functions
 - `safe_package_remove()` - Line 4080 (Package existence validation, error capture, consistent logging)
@@ -111,6 +123,11 @@
 11. **Package removal improvements (2025-07-21)**: Added `safe_package_remove()` helper function (Line 4080) with proper error capture, package existence validation, and consistent screen/log output
 12. **Preset system implementation (2025-07-22)**: Added four preset configurations (--preset=lamp|lemp|minimal|full) for quick installation - Lines 4989-5037
 13. **Early error detection (2025-07-22)**: Added `check_early_nothing_to_install()` function to show immediate helpful error for empty --skip scenarios - setup-noninteractive.sh Lines 59-79, setup.sh Line 4870
+14. **Database installation enhancements (2025-07-23)**: Comprehensive improvements to MySQL, MariaDB, and PostgreSQL installations
+    - Enhanced removal functions with comprehensive cleanup (Lines 5182-5208, 5207-5229, 5397-5423)
+    - Pre-installation cleanup for all databases (Lines 1565-1576, 1667-1678, 2026-2044)
+    - OS-specific authentication methods (Lines 1656-1790, 1741-1874, 2159-2232)
+    - Improved error diagnosis with service status checking (Lines 1857-1874, 1761-1775, 2214-2232)
 
 ## Non-Interactive Mode Usage
 

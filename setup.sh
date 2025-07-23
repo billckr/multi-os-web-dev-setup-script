@@ -88,7 +88,7 @@ print_success() {
 }
 
 print_warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1"
+    echo -e "   ${YELLOW}[WARNING]${NC} $1"
     log "WARNING" "$1"
 }
 
@@ -517,22 +517,19 @@ detect_os() {
 # Check VPN status
 check_vpn() {
     echo ""
-    echo -e "${BLUE}VPN Options:${NC}"
-    echo -e "${BLUE}-----------${NC}"
+    echo -e "   ${BLUE}VPN Options:${NC}"
+    echo -e "   ${BLUE}-----------${NC}"
     
     while true; do
         echo -e "Are you currently using a VPN? (y/N): \c"
         read -r
         
         if [[ $REPLY =~ ^[Yy]$ ]]; then
-            print_info "Using VPN"
-            print_warning "VPN detected. Please ensure your connection remains stable during installation."
-            print_warning "If connection drops, you may lose access to the server."
+            print_info "Connection changes during install could lock you out of the server."
             log "WARNING" "User confirmed VPN usage"
             
             read -p "Continue anyway? (y/N): " -r
             if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-                print_info "Installation cancelled by user due to VPN concerns"
                 exit 0
             fi
             break
@@ -1496,7 +1493,11 @@ install_apache() {
     
     # Start and enable Apache
     systemctl start "$service_name"
-    systemctl enable "$service_name"
+    if systemctl enable "$service_name" >/dev/null 2>&1; then
+        print_success "$service_name service enabled for startup"
+    else
+        print_warning "Failed to enable $service_name service for startup"
+    fi
     INSTALLED_SERVICES+=("$service_name")
     
     # Configure firewall
@@ -1539,7 +1540,11 @@ install_nginx() {
     
     # Start and enable Nginx
     systemctl start "$service_name"
-    systemctl enable "$service_name"
+    if systemctl enable "$service_name" >/dev/null 2>&1; then
+        print_success "$service_name service enabled for startup"
+    else
+        print_warning "Failed to enable $service_name service for startup"
+    fi
     INSTALLED_SERVICES+=("$service_name")
     
     # Configure firewall
@@ -1556,6 +1561,19 @@ install_nginx() {
 install_mysql() {
     print_info "Installing MySQL server..."
     log "INFO" "Starting MySQL installation"
+    
+    # Clean up any previous installation remnants
+    print_info "Cleaning up any previous MySQL installation..."
+    systemctl stop mysqld 2>/dev/null || true
+    systemctl stop mysql 2>/dev/null || true
+    systemctl stop mariadb 2>/dev/null || true
+    
+    # Remove any existing data directories that might cause conflicts
+    if [[ -d "/var/lib/mysql" && ! -f "/var/lib/mysql/mysql/user.frm" ]]; then
+        # Only remove if it's empty or corrupted (no user table)
+        rm -rf /var/lib/mysql 2>/dev/null || true
+        log "INFO" "Removed existing empty/corrupted MySQL data directory"
+    fi
     
     local mysql_packages=()
     local service_name="mysqld"
@@ -1629,8 +1647,17 @@ secure_mysql_installation() {
     # Generate cryptographically secure random password
     local mysql_root_password=$(secure_random_password)
     
-    # Set root password and remove anonymous users
-    mysql -u root <<EOF
+    # Wait for MySQL to be fully ready
+    sleep 2
+    
+    # Use OS-specific authentication method for MySQL security
+    local secured=false
+    
+    case "$PACKAGE_MANAGER" in
+        dnf|yum)
+            # RHEL-based systems (AlmaLinux, Rocky, CentOS, RHEL)
+            print_info "Using RHEL-based MySQL security method..."
+            if mysql -u root <<EOF >/dev/null 2>&1
 ALTER USER 'root'@'localhost' IDENTIFIED BY '$mysql_root_password';
 DELETE FROM mysql.user WHERE User='';
 DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');
@@ -1638,6 +1665,114 @@ DROP DATABASE IF EXISTS test;
 DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';
 FLUSH PRIVILEGES;
 EOF
+            then
+                secured=true
+                log "INFO" "MySQL secured using RHEL passwordless method"
+            else
+                log "WARNING" "RHEL passwordless method failed, trying sudo method"
+                # Fallback to sudo method
+                if sudo mysql -u root <<EOF >/dev/null 2>&1
+ALTER USER 'root'@'localhost' IDENTIFIED BY '$mysql_root_password';
+DELETE FROM mysql.user WHERE User='';
+DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');
+DROP DATABASE IF EXISTS test;
+DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';
+FLUSH PRIVILEGES;
+EOF
+                then
+                    secured=true
+                    log "INFO" "MySQL secured using RHEL sudo method"
+                fi
+            fi
+            ;;
+        apt)
+            # Debian/Ubuntu systems
+            print_info "Using Debian/Ubuntu MySQL security method..."
+            if sudo mysql -u root <<EOF >/dev/null 2>&1
+ALTER USER 'root'@'localhost' IDENTIFIED BY '$mysql_root_password';
+DELETE FROM mysql.user WHERE User='';
+DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');
+DROP DATABASE IF EXISTS test;
+DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';
+FLUSH PRIVILEGES;
+EOF
+            then
+                secured=true
+                log "INFO" "MySQL secured using Debian/Ubuntu sudo method"
+            else
+                log "WARNING" "Debian/Ubuntu sudo method failed, trying passwordless method"
+                # Fallback to passwordless method
+                if mysql -u root <<EOF >/dev/null 2>&1
+ALTER USER 'root'@'localhost' IDENTIFIED BY '$mysql_root_password';
+DELETE FROM mysql.user WHERE User='';
+DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');
+DROP DATABASE IF EXISTS test;
+DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';
+FLUSH PRIVILEGES;
+EOF
+                then
+                    secured=true
+                    log "INFO" "MySQL secured using Debian/Ubuntu passwordless method"
+                fi
+            fi
+            ;;
+        zypper)
+            # openSUSE systems
+            print_info "Using openSUSE MySQL security method..."
+            if mysql -u root <<EOF >/dev/null 2>&1
+ALTER USER 'root'@'localhost' IDENTIFIED BY '$mysql_root_password';
+DELETE FROM mysql.user WHERE User='';
+DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');
+DROP DATABASE IF EXISTS test;
+DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';
+FLUSH PRIVILEGES;
+EOF
+            then
+                secured=true
+                log "INFO" "MySQL secured using openSUSE passwordless method"
+            fi
+            ;;
+        pacman)
+            # Arch Linux systems
+            print_info "Using Arch Linux MySQL security method..."
+            if mysql -u root <<EOF >/dev/null 2>&1
+ALTER USER 'root'@'localhost' IDENTIFIED BY '$mysql_root_password';
+DELETE FROM mysql.user WHERE User='';
+DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');
+DROP DATABASE IF EXISTS test;
+DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';
+FLUSH PRIVILEGES;
+EOF
+            then
+                secured=true
+                log "INFO" "MySQL secured using Arch Linux passwordless method"
+            fi
+            ;;
+        *)
+            print_warning "Unknown package manager: $PACKAGE_MANAGER"
+            log "WARNING" "Unknown package manager for MySQL security: $PACKAGE_MANAGER"
+            ;;
+    esac
+    
+    if [[ "$secured" != "true" ]]; then
+        print_error "Failed to secure MySQL installation"
+        log "ERROR" "MySQL security setup failed - all authentication methods failed"
+        
+        # Additional debugging information
+        print_info "Checking MySQL service status for debugging..."
+        systemctl status mysqld --no-pager -l 2>/dev/null || systemctl status mysql --no-pager -l 2>/dev/null || true
+        
+        # Check if MySQL is actually running
+        if systemctl is-active mysqld >/dev/null 2>&1 || systemctl is-active mysql >/dev/null 2>&1; then
+            print_info "MySQL service is running, but authentication failed"
+            log "ERROR" "MySQL service active but authentication methods failed"
+        else
+            print_error "MySQL service is not running properly"
+            log "ERROR" "MySQL service not active - installation may have failed"
+        fi
+        
+        return 1
+    fi
     
     # Save credentials using secure file creation
     local credentials="[client]
@@ -1658,6 +1793,19 @@ password=$mysql_root_password"
 install_mariadb() {
     print_info "Installing MariaDB server..."
     log "INFO" "Starting MariaDB installation"
+    
+    # Clean up any previous installation remnants
+    print_info "Cleaning up any previous MariaDB installation..."
+    systemctl stop mariadb 2>/dev/null || true
+    systemctl stop mysql 2>/dev/null || true
+    systemctl stop mysqld 2>/dev/null || true
+    
+    # Remove any existing data directories that might cause conflicts
+    if [[ -d "/var/lib/mysql" && ! -f "/var/lib/mysql/mysql/user.frm" ]]; then
+        # Only remove if it's empty or corrupted (no user table)
+        rm -rf /var/lib/mysql 2>/dev/null || true
+        log "INFO" "Removed existing empty/corrupted MySQL data directory"
+    fi
     
     local mariadb_packages=()
     local service_name="mariadb"
@@ -1682,24 +1830,34 @@ install_mariadb() {
         install_package "$package" "MariaDB package: $package"
     done
     
-    # Initialize MariaDB (for RHEL-based and Arch systems)
-    if [[ "$PACKAGE_MANAGER" == "dnf" || "$PACKAGE_MANAGER" == "yum" ]]; then
-        if [[ ! -d "/var/lib/mysql/mysql" ]]; then
-            print_info "Initializing MariaDB database..."
-            mysql_install_db --user=mysql --datadir=/var/lib/mysql
-            log "INFO" "MariaDB database initialized"
-        fi
-    elif [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
-        if [[ ! -d "/var/lib/mysql/mysql" ]]; then
-            print_info "Initializing MariaDB database..."
-            mariadb-install-db --user=mysql --basedir=/usr --datadir=/var/lib/mysql
-            log "INFO" "MariaDB database initialized"
-        fi
+    # Initialize MariaDB if needed
+    if [[ ! -d "/var/lib/mysql/mysql" ]]; then
+        print_info "Initializing MariaDB database..."
+        case "$PACKAGE_MANAGER" in
+            dnf|yum)
+                mysql_install_db --user=mysql --datadir=/var/lib/mysql >/dev/null
+                ;;
+            apt)
+                # Debian/Ubuntu: MariaDB usually auto-initializes, but ensure it's done
+                mysqld --initialize-insecure --user=mysql --datadir=/var/lib/mysql >/dev/null 2>&1 || true
+                ;;
+            zypper)
+                mysql_install_db --user=mysql --datadir=/var/lib/mysql >/dev/null
+                ;;
+            pacman)
+                mariadb-install-db --user=mysql --basedir=/usr --datadir=/var/lib/mysql >/dev/null
+                ;;
+        esac
+        log "INFO" "MariaDB database initialized"
     fi
     
     # Start and enable MariaDB
     systemctl start "$service_name"
-    systemctl enable "$service_name"
+    if systemctl enable "$service_name" >/dev/null 2>&1; then
+        print_success "$service_name service enabled for startup"
+    else
+        print_warning "Failed to enable $service_name service for startup"
+    fi
     INSTALLED_SERVICES+=("$service_name")
     
     # Secure MariaDB installation
@@ -1717,8 +1875,18 @@ secure_mariadb_installation() {
     # Generate cryptographically secure random password
     local mariadb_root_password=$(secure_random_password)
     
-    # Set root password and remove anonymous users
-    mysql -u root <<EOF
+    # Wait for MariaDB to be fully ready
+    sleep 2
+    
+    # Use OS-specific authentication method for MariaDB security
+    local secured=false
+    
+    case "$PACKAGE_MANAGER" in
+        dnf|yum)
+            # RHEL-based systems (AlmaLinux, Rocky, CentOS, RHEL)
+            # Typically use passwordless root authentication initially
+            print_info "Using RHEL-based MariaDB security method..."
+            if mysql -u root <<EOF >/dev/null 2>&1
 ALTER USER 'root'@'localhost' IDENTIFIED BY '$mariadb_root_password';
 DELETE FROM mysql.user WHERE User='';
 DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');
@@ -1726,6 +1894,114 @@ DROP DATABASE IF EXISTS test;
 DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';
 FLUSH PRIVILEGES;
 EOF
+            then
+                secured=true
+                log "INFO" "MariaDB secured using RHEL passwordless method"
+            else
+                log "WARNING" "RHEL passwordless method failed, trying sudo method"
+                # Fallback to sudo method
+                if sudo mysql -u root <<EOF >/dev/null 2>&1
+ALTER USER 'root'@'localhost' IDENTIFIED BY '$mariadb_root_password';
+DELETE FROM mysql.user WHERE User='';
+DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');
+DROP DATABASE IF EXISTS test;
+DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';
+FLUSH PRIVILEGES;
+EOF
+                then
+                    secured=true
+                    log "INFO" "MariaDB secured using RHEL sudo method"
+                fi
+            fi
+            ;;
+        apt)
+            # Debian/Ubuntu systems typically use unix_socket authentication
+            print_info "Using Debian/Ubuntu MariaDB security method..."
+            if sudo mysql -u root <<EOF >/dev/null 2>&1
+ALTER USER 'root'@'localhost' IDENTIFIED BY '$mariadb_root_password';
+DELETE FROM mysql.user WHERE User='';
+DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');
+DROP DATABASE IF EXISTS test;
+DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';
+FLUSH PRIVILEGES;
+EOF
+            then
+                secured=true
+                log "INFO" "MariaDB secured using Debian/Ubuntu sudo method"
+            else
+                log "WARNING" "Debian/Ubuntu sudo method failed, trying passwordless method"
+                # Fallback to passwordless method
+                if mysql -u root <<EOF >/dev/null 2>&1
+ALTER USER 'root'@'localhost' IDENTIFIED BY '$mariadb_root_password';
+DELETE FROM mysql.user WHERE User='';
+DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');
+DROP DATABASE IF EXISTS test;
+DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';
+FLUSH PRIVILEGES;
+EOF
+                then
+                    secured=true
+                    log "INFO" "MariaDB secured using Debian/Ubuntu passwordless method"
+                fi
+            fi
+            ;;
+        zypper)
+            # openSUSE systems
+            print_info "Using openSUSE MariaDB security method..."
+            if mysql -u root <<EOF >/dev/null 2>&1
+ALTER USER 'root'@'localhost' IDENTIFIED BY '$mariadb_root_password';
+DELETE FROM mysql.user WHERE User='';
+DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');
+DROP DATABASE IF EXISTS test;
+DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';
+FLUSH PRIVILEGES;
+EOF
+            then
+                secured=true
+                log "INFO" "MariaDB secured using openSUSE passwordless method"
+            fi
+            ;;
+        pacman)
+            # Arch Linux systems
+            print_info "Using Arch Linux MariaDB security method..."
+            if mysql -u root <<EOF >/dev/null 2>&1
+ALTER USER 'root'@'localhost' IDENTIFIED BY '$mariadb_root_password';
+DELETE FROM mysql.user WHERE User='';
+DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');
+DROP DATABASE IF EXISTS test;
+DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';
+FLUSH PRIVILEGES;
+EOF
+            then
+                secured=true
+                log "INFO" "MariaDB secured using Arch Linux passwordless method"
+            fi
+            ;;
+        *)
+            print_warning "Unknown package manager: $PACKAGE_MANAGER"
+            log "WARNING" "Unknown package manager for MariaDB security: $PACKAGE_MANAGER"
+            ;;
+    esac
+    
+    if [[ "$secured" != "true" ]]; then
+        print_error "Failed to secure MariaDB installation"
+        log "ERROR" "MariaDB security setup failed - all authentication methods failed"
+        
+        # Additional debugging information
+        print_info "Checking MariaDB service status for debugging..."
+        systemctl status mariadb --no-pager -l 2>/dev/null || true
+        
+        # Check if MariaDB is actually running
+        if systemctl is-active mariadb >/dev/null 2>&1; then
+            print_info "MariaDB service is running, but authentication failed"
+            log "ERROR" "MariaDB service active but authentication methods failed"
+        else
+            print_error "MariaDB service is not running properly"
+            log "ERROR" "MariaDB service not active - installation may have failed"
+        fi
+        
+        return 1
+    fi
     
     # Save credentials using secure file creation
     local credentials="[client]
@@ -1746,6 +2022,26 @@ password=$mariadb_root_password"
 install_postgresql() {
     print_info "Installing PostgreSQL server..."
     log "INFO" "Starting PostgreSQL installation"
+    
+    # Clean up any previous installation remnants
+    print_info "Cleaning up any previous PostgreSQL installation..."
+    systemctl stop postgresql 2>/dev/null || true
+    systemctl stop postgresql-16 2>/dev/null || true
+    systemctl stop postgresql-15 2>/dev/null || true
+    systemctl stop postgresql-14 2>/dev/null || true
+    systemctl stop postgresql-13 2>/dev/null || true
+    
+    # Remove any existing data directories that might cause conflicts
+    if [[ -d "/var/lib/pgsql" && ! -f "/var/lib/pgsql/data/PG_VERSION" ]]; then
+        # Only remove if it's empty or corrupted (no PG_VERSION file)
+        rm -rf /var/lib/pgsql 2>/dev/null || true
+        log "INFO" "Removed existing empty/corrupted PostgreSQL data directory"
+    fi
+    if [[ -d "/var/lib/postgresql" && ! -f "/var/lib/postgresql/*/main/PG_VERSION" ]]; then
+        # Only remove if it's empty or corrupted (no PG_VERSION file)
+        rm -rf /var/lib/postgresql 2>/dev/null || true
+        log "INFO" "Removed existing empty/corrupted PostgreSQL data directory"
+    fi
     
     local postgresql_packages=()
     local service_name="postgresql"
@@ -1795,7 +2091,11 @@ install_postgresql() {
     
     # Start and enable PostgreSQL
     systemctl start "$service_name"
-    systemctl enable "$service_name"
+    if systemctl enable "$service_name" >/dev/null 2>&1; then
+        print_success "$service_name service enabled for startup"
+    else
+        print_warning "Failed to enable $service_name service for startup"
+    fi
     INSTALLED_SERVICES+=("$service_name")
     
     # Create a development database and user
@@ -1850,13 +2150,86 @@ setup_postgresql_dev_user() {
         sleep 2
     fi
     
-    # Create development user and database
-    sudo -u postgres psql <<EOF
+    # Wait for PostgreSQL to be fully ready
+    sleep 3
+    
+    # Create development user and database with error handling
+    local pg_setup_success=false
+    
+    case "$PACKAGE_MANAGER" in
+        dnf|yum|zypper)
+            # RHEL-based and openSUSE systems
+            print_info "Using RHEL/openSUSE PostgreSQL setup method..."
+            if sudo -u postgres psql <<EOF >/dev/null 2>&1
 CREATE USER webdev WITH ENCRYPTED PASSWORD '$dev_password';
 CREATE DATABASE webdev_db OWNER webdev;
 GRANT ALL PRIVILEGES ON DATABASE webdev_db TO webdev;
 \q
 EOF
+            then
+                pg_setup_success=true
+                log "INFO" "PostgreSQL user created using RHEL/openSUSE method"
+            else
+                log "WARNING" "RHEL/openSUSE PostgreSQL setup failed"
+            fi
+            ;;
+        apt)
+            # Debian/Ubuntu systems
+            print_info "Using Debian/Ubuntu PostgreSQL setup method..."
+            if sudo -u postgres psql <<EOF >/dev/null 2>&1
+CREATE USER webdev WITH ENCRYPTED PASSWORD '$dev_password';
+CREATE DATABASE webdev_db OWNER webdev;
+GRANT ALL PRIVILEGES ON DATABASE webdev_db TO webdev;
+\q
+EOF
+            then
+                pg_setup_success=true
+                log "INFO" "PostgreSQL user created using Debian/Ubuntu method"
+            else
+                log "WARNING" "Debian/Ubuntu PostgreSQL setup failed"
+            fi
+            ;;
+        pacman)
+            # Arch Linux systems
+            print_info "Using Arch Linux PostgreSQL setup method..."
+            if sudo -u postgres psql <<EOF >/dev/null 2>&1
+CREATE USER webdev WITH ENCRYPTED PASSWORD '$dev_password';
+CREATE DATABASE webdev_db OWNER webdev;
+GRANT ALL PRIVILEGES ON DATABASE webdev_db TO webdev;
+\q
+EOF
+            then
+                pg_setup_success=true
+                log "INFO" "PostgreSQL user created using Arch Linux method"
+            else
+                log "WARNING" "Arch Linux PostgreSQL setup failed"
+            fi
+            ;;
+        *)
+            print_warning "Unknown package manager: $PACKAGE_MANAGER"
+            log "WARNING" "Unknown package manager for PostgreSQL setup: $PACKAGE_MANAGER"
+            ;;
+    esac
+    
+    if [[ "$pg_setup_success" != "true" ]]; then
+        print_error "Failed to create PostgreSQL development user"
+        log "ERROR" "PostgreSQL development user creation failed"
+        
+        # Additional debugging information
+        print_info "Checking PostgreSQL service status for debugging..."
+        systemctl status postgresql --no-pager -l 2>/dev/null || true
+        
+        # Check if PostgreSQL is actually running
+        if systemctl is-active postgresql >/dev/null 2>&1; then
+            print_info "PostgreSQL service is running, but user creation failed"
+            log "ERROR" "PostgreSQL service active but user creation failed"
+        else
+            print_error "PostgreSQL service is not running properly"
+            log "ERROR" "PostgreSQL service not active - installation may have failed"
+        fi
+        
+        return 1
+    fi
     
     # Save credentials for easy access
     cat > /root/postgresql-info.txt <<EOF
@@ -3200,7 +3573,7 @@ install_claude_ai() {
         
         # Verify installation
         if command -v claude >/dev/null 2>&1; then
-            local claude_version=$(claude --version 2>/dev/null || echo "version detection failed")
+            local claude_version=$(claude --version 2>/dev/null | head -n 1 || echo "version detection failed")
             print_success "Claude AI Code verified: $claude_version"
             log "INFO" "Claude AI Code verification completed: $claude_version"
             
@@ -3500,7 +3873,13 @@ EOF
         }
     fi
     
-    systemctl enable fail2ban
+    if systemctl enable fail2ban >/dev/null 2>&1; then
+        print_success "Created fail2ban symlink"
+        log "INFO" "Fail2ban service enabled for startup"
+    else
+        print_warning "Failed to enable fail2ban service for startup"
+        log "WARNING" "Failed to enable fail2ban service for startup"
+    fi
     INSTALLED_SERVICES+=("fail2ban")
     
     print_success "Fail2ban installed and configured successfully"
@@ -4143,7 +4522,7 @@ validate_development_tools() {
                 ;;
             claude-ai)
                 if command -v claude >/dev/null 2>&1; then
-                    local claude_version=$(claude --version 2>/dev/null || echo "version detection failed")
+                    local claude_version=$(claude --version 2>/dev/null | head -n 1 || echo "version detection failed")
                     print_success "Claude AI Code validation: PASSED - $claude_version"
                     log "INFO" "Claude AI Code validation: PASSED - $claude_version"
                 else
@@ -4399,6 +4778,9 @@ remove_installation() {
     # Remove package managers
     remove_package_managers
     
+    # Remove essential tools
+    remove_essential_tools
+    
     # Remove development tools
     remove_development_tools
     
@@ -4430,7 +4812,7 @@ remove_installation() {
         echo "  • Final cleanup completed"
     fi
     if [[ "$REMOVE_CLAUDE" == false ]]; then
-        echo "  • All components have been removed except Claude AI Code and its dependencies."
+        echo "  • 100% of components removed except Claude AI Code and dependencies"
         echo "  • Claude AI Code, Node.js, and npm remain installed and functional."
         echo "  • To remove Claude AI Code later, run: npm uninstall -g @anthropic-ai/claude-code"
     else
@@ -4757,6 +5139,72 @@ remove_php() {
     log "INFO" "PHP removal completed"
 }
 
+# Remove essential tools
+remove_essential_tools() {
+    print_info "Starting essential tools removal..."
+    log "INFO" "Removing essential tools"
+    
+    case "$PACKAGE_MANAGER" in
+        dnf)
+            # Remove essential tools packages
+            for package in curl wget net-tools nmap-ncat atop; do
+                if rpm -q "$package" >/dev/null 2>&1; then
+                    print_info "Removing essential tool: $package"
+                    dnf remove -y "$package" >/dev/null 2>&1 || true
+                    log "INFO" "Removed essential tool: $package"
+                fi
+            done
+            ;;
+        yum)
+            # Remove essential tools packages
+            for package in curl wget net-tools nmap-ncat atop; do
+                if rpm -q "$package" >/dev/null 2>&1; then
+                    print_info "Removing essential tool: $package"
+                    yum remove -y "$package" >/dev/null 2>&1 || true
+                    log "INFO" "Removed essential tool: $package"
+                fi
+            done
+            ;;
+        apt)
+            # Remove essential tools packages
+            for package in curl wget net-tools netcat-openbsd atop; do
+                if dpkg -l "$package" 2>/dev/null | grep -q "^ii"; then
+                    print_info "Removing essential tool: $package"
+                    apt-get remove --purge -y "$package" >/dev/null 2>&1 || true
+                    log "INFO" "Removed essential tool: $package"
+                fi
+            done
+            ;;
+        zypper)
+            # Remove essential tools packages
+            for package in curl wget net-tools netcat-openbsd atop; do
+                if zypper se -i "$package" >/dev/null 2>&1; then
+                    print_info "Removing essential tool: $package"
+                    zypper remove -y "$package" >/dev/null 2>&1 || true
+                    log "INFO" "Removed essential tool: $package"
+                fi
+            done
+            ;;
+        pacman)
+            # Remove essential tools packages
+            for package in curl wget net-tools gnu-netcat atop; do
+                if pacman -Q "$package" >/dev/null 2>&1; then
+                    print_info "Removing essential tool: $package"
+                    pacman -R --noconfirm "$package" >/dev/null 2>&1 || true
+                    log "INFO" "Removed essential tool: $package"
+                fi
+            done
+            ;;
+        *)
+            print_warning "Unknown package manager: $PACKAGE_MANAGER"
+            log "WARNING" "Unknown package manager for essential tools removal: $PACKAGE_MANAGER"
+            ;;
+    esac
+    
+    print_success "Essential tools removal completed"
+    log "INFO" "Essential tools removal completed"
+}
+
 # Remove package managers
 remove_package_managers() {
     print_info "Starting package managers removal..."
@@ -4955,11 +5403,31 @@ remove_mysql_packages() {
 }
 
 remove_mysql_data() {
+    # Stop all MySQL services (different names on different systems)
     systemctl stop mysqld 2>/dev/null || true
     systemctl stop mysql 2>/dev/null || true
+    systemctl stop mariadb 2>/dev/null || true
+    
+    # Remove data directories (both common locations)
     rm -rf /var/lib/mysql* 2>/dev/null || true
+    rm -rf /var/lib/mysqld* 2>/dev/null || true
+    
+    # Remove configuration files and credentials
     rm -f /root/.my.cnf 2>/dev/null || true
     rm -rf /etc/mysql* 2>/dev/null || true
+    rm -rf /etc/mysqld* 2>/dev/null || true
+    
+    # Remove any socket files
+    rm -f /var/run/mysqld/mysqld.sock 2>/dev/null || true
+    rm -f /run/mysqld/mysqld.sock 2>/dev/null || true
+    rm -f /tmp/mysql.sock 2>/dev/null || true
+    
+    # Remove log files that might cause issues
+    rm -f /var/log/mysqld.log 2>/dev/null || true
+    rm -f /var/log/mysql.log 2>/dev/null || true
+    
+    print_success "MySQL data and configuration removed"
+    log "INFO" "MySQL data directories and configuration files removed"
 }
 
 remove_mariadb_packages() {
@@ -4980,10 +5448,26 @@ remove_mariadb_packages() {
 }
 
 remove_mariadb_data() {
+    # Stop all MariaDB services
     systemctl stop mariadb 2>/dev/null || true
+    systemctl stop mysql 2>/dev/null || true
+    systemctl stop mysqld 2>/dev/null || true
+    
+    # Remove data directories (both common locations)
+    rm -rf /var/lib/mysql* 2>/dev/null || true
     rm -rf /var/lib/mariadb* 2>/dev/null || true
+    
+    # Remove configuration files and credentials
     rm -f /root/.my.cnf 2>/dev/null || true
+    rm -rf /etc/mysql* 2>/dev/null || true
     rm -rf /etc/mariadb* 2>/dev/null || true
+    
+    # Remove any socket files
+    rm -f /var/run/mysqld/mysqld.sock 2>/dev/null || true
+    rm -f /run/mysqld/mysqld.sock 2>/dev/null || true
+    
+    print_success "MariaDB data and configuration removed"
+    log "INFO" "MariaDB data directories and configuration files removed"
 }
 
 remove_postgresql_packages() {
@@ -5004,10 +5488,31 @@ remove_postgresql_packages() {
 }
 
 remove_postgresql_data() {
+    # Stop all PostgreSQL services (different names on different systems)
     systemctl stop postgresql 2>/dev/null || true
+    systemctl stop postgresql-16 2>/dev/null || true
+    systemctl stop postgresql-15 2>/dev/null || true
+    systemctl stop postgresql-14 2>/dev/null || true
+    systemctl stop postgresql-13 2>/dev/null || true
+    
+    # Remove data directories (multiple possible locations)
     rm -rf /var/lib/pgsql* 2>/dev/null || true
     rm -rf /var/lib/postgres* 2>/dev/null || true
+    rm -rf /var/lib/postgresql* 2>/dev/null || true
+    
+    # Remove configuration files
+    rm -rf /etc/postgresql* 2>/dev/null || true
     rm -f /root/postgresql-info.txt 2>/dev/null || true
+    
+    # Remove socket files
+    rm -f /var/run/postgresql/.s.PGSQL.* 2>/dev/null || true
+    rm -f /tmp/.s.PGSQL.* 2>/dev/null || true
+    
+    # Remove log files that might cause issues
+    rm -f /var/log/postgresql* 2>/dev/null || true
+    
+    print_success "PostgreSQL data and configuration removed"
+    log "INFO" "PostgreSQL data directories and configuration files removed"
 }
 
 remove_sqlite_packages() {
@@ -5681,14 +6186,10 @@ main() {
         
         if [[ "${SELECTED_PHP_VERSIONS[0]}" != "none" ]]; then
             if [[ ${#SELECTED_PHP_VERSIONS[@]} -gt 1 ]]; then
-                echo "  • PHP: Multiple versions installed (${SELECTED_PHP_VERSIONS[*]})"
-                if [[ -n "$DEFAULT_PHP_VERSION" ]]; then
-                    echo "    • $DEFAULT_PHP_VERSION set as default PHP version"
-                fi
+                echo "  • PHP: [${SELECTED_PHP_VERSIONS[*]// /][}] installed. $DEFAULT_PHP_VERSION set as default"
                 log "COMPLETION" "PHP versions: ${SELECTED_PHP_VERSIONS[*]}, default: $DEFAULT_PHP_VERSION"
             else
-                echo "  • PHP: ${SELECTED_PHP_VERSIONS[0]} installed"
-                echo "    • ${SELECTED_PHP_VERSIONS[0]} set as default PHP version"
+                echo "  • PHP: ${SELECTED_PHP_VERSIONS[0]} installed. ${SELECTED_PHP_VERSIONS[0]} set as default"
                 log "COMPLETION" "PHP version: ${SELECTED_PHP_VERSIONS[0]}"
             fi
         else
@@ -5756,7 +6257,7 @@ main() {
                         ;;
                     claude-ai)
                         if command -v claude >/dev/null 2>&1; then
-                            local claude_version=$(claude --version 2>/dev/null || echo "version detection failed")
+                            local claude_version=$(claude --version 2>/dev/null | head -n 1 || echo "version detection failed")
                             echo "  • Claude AI Code: $claude_version"
                             log "COMPLETION" "Claude AI Code status: $claude_version"
                         else
@@ -5776,8 +6277,8 @@ main() {
         log "COMPLETION" "Fail2ban service status: $fail2ban_status"
         
         echo ""
-        echo -e "${BLUE}Next Steps:${NC}"
-        echo -e "${BLUE}----------${NC}"
+        echo -e "   ${BLUE}Next Steps:${NC}"
+        echo -e "   ${BLUE}----------${NC}"
         echo -e "  • Visit ${BLUE}http://$(hostname -I | awk '{print $1}')${NC} to test installation"
         echo "  • Default index page shows Hello World and server info"
         echo "  • Configure your domain DNS to point to this server"
@@ -5842,8 +6343,8 @@ main() {
         fi
         
         echo ""
-        echo -e "${BLUE}Important to do items:${NC}"
-        echo -e "${BLUE}---------------------${NC}"
+        echo -e "   ${BLUE}Important to do items:${NC}"
+        echo -e "   ${BLUE}---------------------${NC}"
         echo "  • Read the README.md - /root/README.md"
         echo "  • Remove any database setup information for security"
         echo "  • Enjoy your new development server!"
@@ -5865,10 +6366,9 @@ main() {
     fi
     
     log "COMPLETION" "Script execution completed"
-    echo -e "   ${LIGHT_GREY}[INFO]${NC} Install log: ${BLUE}$LOG_FILE${NC}"
-    echo -e "   ${LIGHT_GREY}[INFO]${NC} 🔄 Important: run: ${BLUE}hash -r${NC} (clears bash command cache)"
-    echo -e "   ${LIGHT_GREY}[INFO]${NC} Note: Only errors, warnings, and completion messages were logged."
-    echo -e "   ${LIGHT_GREY}[INFO]${NC} Use '${BLUE}$0 --verbose${NC}' for detailed installation logs."
+    echo "  • Install log: $LOG_FILE"
+    echo -e "  • 🔄 Important: run: ${BLUE}hash -r${NC} (clears bash command cache)"
+    echo -e "  • Use '${BLUE}$0 --verbose${NC}' for detailed installation logs."
     
     echo ""
     echo -e "${BLUE}===========================================================================${NC}"

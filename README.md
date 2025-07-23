@@ -99,12 +99,14 @@ sudo ./setup.sh --non-interactive --remove
 - **Nginx**: Unified configuration with PHP-FPM integration (Unix socket or TCP)
 
 ### Databases
-- **MySQL**: Automatic initialization with secure random passwords
-- **MariaDB**: Development-ready setup with credential management
-- **PostgreSQL**: User setup with sample database creation
-- **SQLite**: Lightweight option with sample database
+- **MySQL**: Enhanced installation with OS-specific authentication, pre-installation cleanup, and automatic initialization with secure random passwords
+- **MariaDB**: Improved security setup with multiple authentication methods, automatic remnant cleanup, and development-ready credential management
+- **PostgreSQL**: Robust installation with version-aware cleanup, OS-specific user creation, and sample database setup
+- **SQLite**: Lightweight option with sample database creation
 - **MongoDB**: NoSQL document database
 - **Redis**: In-memory data structure store
+
+**New (2025-07-23)**: All database installations now include comprehensive error handling, pre-installation cleanup of conflicting remnants, and OS-specific authentication methods for reliable installation on "dirty" systems.
 
 ### PHP Stack
 - **Multi-Version Support**: PHP 8.2, 8.3, 8.4 (install multiple simultaneously)
@@ -240,6 +242,17 @@ These networking and monitoring tools are automatically installed and verified:
 - **Service Status**: Check with `systemctl status <service>`
 - **Firewall Status**: Check with `firewall-cmd --list-all` or `ufw status`
 - **Bash Cache Issues**: If commands show "not found" after installation/removal, run `hash -r` to clear command cache
+
+### Database Installation Troubleshooting
+- **Authentication Failed**: Database security setup now uses OS-specific methods. Check `/root/install-log-*.log` for specific authentication method used
+- **Service Not Running**: Enhanced error diagnosis shows service status when database setup fails
+- **Dirty System Issues**: Script now automatically cleans up:
+  - Conflicting database services before installation
+  - Corrupted/empty data directories (preserves valid databases)
+  - Configuration files, socket files, and log files during removal
+- **Previous Installation Remnants**: Use `sudo ./setup.sh --remove` for comprehensive cleanup before reinstalling
+- **MySQL/MariaDB Access**: Credentials saved in `/root/.my.cnf` with 600 permissions
+- **PostgreSQL Access**: Development credentials saved in `/root/postgresql-info.txt`
 
 ### Multiple PHP Versions Troubleshooting
 - **Check installed versions**: `dnf list installed | grep php` (RHEL) or `dpkg -l | grep php` (Debian)
