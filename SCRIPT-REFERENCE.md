@@ -24,10 +24,10 @@
 - `install_mysql()` - Line 1561 (Enhanced with pre-cleanup and OS-specific authentication)
 - `install_mariadb()` - Line 1663 (Enhanced with pre-cleanup and OS-specific authentication)
 - `install_postgresql()` - Line 2022 (Enhanced with pre-cleanup and OS-specific user creation)
-- `install_php()` - Line 2107
-- `configure_apache_php()` - Line 2322
-- `configure_nginx_php()` - Line 2360
-- `set_default_php_version()` - Line 2289
+- `install_php()` - Line 2358
+- `configure_apache_php()` - Line 2572
+- `configure_nginx_php()` - Line 2604 (Enhanced with Unix socket architecture, ACL management, socket directory creation)
+- `set_default_php_version()` - Line 2539
 
 ### Database Security Functions
 - `secure_mysql_installation()` - Line 1643 (OS-specific authentication with comprehensive error handling)
@@ -43,8 +43,9 @@
 - `safe_package_remove()` - Line 4080 (Package existence validation, error capture, consistent logging)
 
 ### Validation Functions
-- `validate_php()` - Line 3439
-- `run_validations()` - Line ~3800
+- `validate_php()` - Line 4214
+- `validate_nginx_php_sockets()` - Line 4047 (Enhanced 5-tier socket validation with specific error diagnostics)
+- `run_validations()` - Line ~4647
 
 ### Repository Setup
 - `setup_repositories()` - Line 1043

@@ -32,7 +32,6 @@ VERBOSE_LOGGING=false
 AUTO_PRESET=false
 PRESET_MODE=false
 SKIP_CONFIRMATION=false
-REMOVE_CLAUDE=false
 NON_INTERACTIVE=false
 DEFAULT_PHP_VERSION=""
 DETECTED_SSH_CLIENT_IP=""
@@ -2657,25 +2656,47 @@ configure_nginx_php() {
                     systemctl enable "$version_service" 2>/dev/null || true
                 done
                 
-                # Configure PHP-FPM services to use TCP instead of sockets  
-                print_info "Configuring PHP-FPM services for TCP connection..."
-                local port=9000
+                # Configure PHP-FPM services to use Unix sockets
+                print_info "Configuring PHP-FPM services for Unix socket connection..."
+                
+                # Create socket directory
+                mkdir -p /run/php-fpm
+                chown nginx:nginx /run/php-fpm 2>/dev/null || chown apache:apache /run/php-fpm 2>/dev/null || true
+                chmod 755 /run/php-fpm
+                
+                # Ensure socket directory persists across reboots
+                cat > /etc/tmpfiles.d/php-fpm-sockets.conf <<EOF
+# PHP-FPM socket directory
+d /run/php-fpm 0755 nginx nginx -
+EOF
+                
                 for version in "${SELECTED_PHP_VERSIONS[@]}"; do
                     local version_nodot="${version//./}"
                     local version_service="php$version_nodot-php-fpm"
                     local fpm_config="/etc/opt/remi/php$version_nodot/php-fpm.d/www.conf"
+                    local socket_path="/run/php-fpm/php$version_nodot.sock"
                     
                     if [[ -f "$fpm_config" ]]; then
-                        # Change from socket to TCP with unique port for each version
-                        sed -i "s/^listen = .*/listen = 127.0.0.1:$port/" "$fpm_config"
-                        sed -i 's/^;listen.allowed_clients = .*/listen.allowed_clients = 127.0.0.1/' "$fpm_config"
-                        print_info "Configured $version_service for TCP (127.0.0.1:$port)"
+                        # Configure for Unix socket
+                        sed -i "s|^listen = .*|listen = $socket_path|" "$fpm_config"
+                        sed -i "s|^;listen.owner = .*|listen.owner = nginx|" "$fpm_config"
+                        sed -i "s|^;listen.group = .*|listen.group = nginx|" "$fpm_config"
+                        sed -i "s|^;listen.mode = .*|listen.mode = 0660|" "$fpm_config"
+                        sed -i 's|^listen.acl_users = .*|;listen.acl_users = apache|' "$fpm_config"
+                        sed -i '/^listen.allowed_clients = /d' "$fpm_config"
+                        print_info "Configured $version_service for Unix socket ($socket_path)"
+                        log "INFO" "PHP-FPM $version configured for socket: $socket_path"
                         
-                        # Restart service to apply TCP configuration
+                        # Restart service to apply socket configuration
                         systemctl restart "$version_service"
                         
-                        # Increment port for next PHP version
-                        ((port++))
+                        # Verify socket was created
+                        sleep 1
+                        if [[ -S "$socket_path" ]]; then
+                            log "SUCCESS" "PHP-FPM socket created: $socket_path"
+                        else
+                            log "WARNING" "PHP-FPM socket not immediately available: $socket_path"
+                        fi
                     fi
                 done
                 
@@ -2761,19 +2782,14 @@ configure_nginx_php() {
     # Create basic PHP-enabled Nginx configuration
     case "$PACKAGE_MANAGER" in
         dnf|yum)
-            # Use Unix socket for default installation (better security and performance)
-            # Check if PHP-FPM is configured for socket or TCP
-            local fastcgi_backend="unix:/run/php-fpm/www.sock"
-            local fpm_pool_config="/etc/php-fpm.d/www.conf"
-            
-            if [[ -f "$fpm_pool_config" ]] && grep -q "^listen = 127.0.0.1:9000" "$fpm_pool_config" 2>/dev/null; then
-                # PHP-FPM is configured for TCP
-                fastcgi_backend="127.0.0.1:9000"
-                print_info "Using TCP connection for PHP-FPM (fallback configuration)"
-            else
-                # Default to socket (preferred)
-                print_info "Using Unix socket for PHP-FPM (default secure configuration)"
+            # Always use Unix socket for Nginx (better security and performance)
+            local default_version_nodot="${DEFAULT_PHP_VERSION//./}"
+            if [[ -z "$default_version_nodot" ]]; then
+                default_version_nodot="${SELECTED_PHP_VERSIONS[0]//./}"
             fi
+            local fastcgi_backend="unix:/run/php-fpm/php$default_version_nodot.sock"
+            print_info "Using Unix socket for PHP-FPM: $fastcgi_backend"
+            log "INFO" "Nginx configured for PHP-FPM socket: $fastcgi_backend"
             
             cat > "$nginx_config" <<EOF
 server {
@@ -3113,7 +3129,7 @@ install_composer() {
     if [[ -f "/usr/local/bin/composer" && -x "/usr/local/bin/composer" ]]; then
         # Update PATH for current session to ensure composer command works
         export PATH="/usr/local/bin:$PATH"
-        local composer_version=$(/usr/local/bin/composer --version --no-ansi)
+        local composer_version=$(/usr/local/bin/composer --version --no-ansi 2>/dev/null)
         print_success "Composer installed successfully: $composer_version"
         log "INFO" "Composer installation completed: $composer_version"
         
@@ -3573,9 +3589,8 @@ install_claude_ai() {
         
         # Verify installation
         if command -v claude >/dev/null 2>&1; then
-            local claude_version=$(claude --version 2>/dev/null | head -n 1 || echo "version detection failed")
-            print_success "Claude AI Code verified: $claude_version"
-            log "INFO" "Claude AI Code verification completed: $claude_version"
+            print_success "Claude AI Code verified: installed and available"
+            log "INFO" "Claude AI Code verification completed: installed and available"
             
             # Add helpful information
             print_info "To use Claude AI Code, run: claude"
@@ -3595,23 +3610,6 @@ install_claude_ai() {
     fi
 }
 
-# Check if Claude AI Code is installed on the system
-is_claude_ai_installed() {
-    # Check if Claude AI Code command is available
-    if command -v claude >/dev/null 2>&1; then
-        return 0
-    fi
-    
-    # Also check if it was selected for installation in this session
-    if [[ -n "${SELECTED_DEVELOPMENT_TOOLS:-}" ]]; then
-        for dev_tool in "${SELECTED_DEVELOPMENT_TOOLS[@]}"; do
-            if [[ "$dev_tool" == "claude-ai" ]]; then
-                return 0
-            fi
-        done
-    fi
-    return 1
-}
 
 # Configure firewall for HTTP
 configure_firewall_http() {
@@ -4052,6 +4050,90 @@ validate_apache() {
     return 0
 }
 
+# Enhanced socket validation for Nginx-PHP integration
+validate_nginx_php_sockets() {
+    if [[ "$SELECTED_WEBSERVER" != "nginx" || "${SELECTED_PHP_VERSIONS[0]}" == "none" ]]; then
+        return 0  # Skip if not using Nginx with PHP
+    fi
+    
+    print_info "Validating Nginx-PHP socket communication..."
+    log "INFO" "Starting Nginx-PHP socket validation"
+    
+    local default_version_nodot="${DEFAULT_PHP_VERSION//./}"
+    if [[ -z "$default_version_nodot" ]]; then
+        default_version_nodot="${SELECTED_PHP_VERSIONS[0]//./}"
+    fi
+    local socket_path="/run/php-fpm/php${default_version_nodot}.sock"
+    local validation_failed=false
+    
+    # Test 1: Socket file exists
+    if [[ ! -S "$socket_path" ]]; then
+        print_error "PHP-FPM socket missing: $socket_path"
+        log "ERROR" "Socket validation failed: Socket file does not exist: $socket_path"
+        log "ERROR" "Diagnostic: PHP-FPM service may have failed to create socket file"
+        log "ERROR" "Suggested check: systemctl status php${default_version_nodot}-php-fpm"
+        validation_failed=true
+    else
+        log "SUCCESS" "Socket file exists: $socket_path"
+    fi
+    
+    # Test 2: Socket permissions
+    if [[ -S "$socket_path" ]] && ! sudo -u nginx test -r "$socket_path" 2>/dev/null; then
+        print_error "Nginx cannot access PHP-FPM socket: $socket_path"
+        log "ERROR" "Socket validation failed: Permission denied for nginx user"
+        log "ERROR" "Diagnostic: Socket permissions or ownership issue detected"
+        log "ERROR" "Suggested fix: chown nginx:nginx $socket_path && chmod 660 $socket_path"
+        validation_failed=true
+    elif [[ -S "$socket_path" ]]; then
+        log "SUCCESS" "Socket permissions validated for nginx user"
+    fi
+    
+    # Test 3: PHP-FPM service listening on socket
+    if [[ -S "$socket_path" ]] && ! netstat -xl 2>/dev/null | grep -q "$socket_path"; then
+        print_error "PHP-FPM not listening on socket: $socket_path"
+        log "ERROR" "Socket validation failed: PHP-FPM service not listening on socket"
+        log "ERROR" "Diagnostic: PHP-FPM configuration may be incorrect"
+        log "ERROR" "Suggested check: grep '^listen' /etc/opt/remi/php${default_version_nodot}/php-fpm.d/www.conf"
+        validation_failed=true
+    elif [[ -S "$socket_path" ]]; then
+        log "SUCCESS" "PHP-FPM listening on socket: $socket_path"
+    fi
+    
+    # Test 4: Nginx configuration points to correct socket
+    local nginx_config="/etc/nginx/conf.d/default.conf"
+    if [[ -f "$nginx_config" ]] && ! grep -q "fastcgi_pass unix:$socket_path" "$nginx_config"; then
+        print_error "Nginx not configured for correct socket path"
+        log "ERROR" "Socket validation failed: Nginx configuration mismatch"
+        log "ERROR" "Expected: fastcgi_pass unix:$socket_path"
+        log "ERROR" "Suggested check: grep fastcgi_pass $nginx_config"
+        validation_failed=true
+    elif [[ -f "$nginx_config" ]]; then
+        log "SUCCESS" "Nginx configured for correct socket: $socket_path"
+    fi
+    
+    # Test 5: End-to-end PHP test (only if previous tests passed)
+    if [[ "$validation_failed" == false ]]; then
+        local php_test_response=$(curl -s http://localhost/index.php 2>/dev/null | head -1)
+        if [[ "$php_test_response" != *"DOCTYPE html"* ]]; then
+            print_warning "PHP processing test inconclusive"
+            log "WARNING" "Socket validation: End-to-end test did not return expected HTML"
+            log "WARNING" "Response received: $php_test_response"
+            log "WARNING" "Suggested check: curl -v http://localhost/index.php"
+            log "WARNING" "Suggested check: journalctl -u php${default_version_nodot}-php-fpm --no-pager -l"
+        else
+            print_success "Nginx-PHP socket communication validated successfully"
+            log "SUCCESS" "End-to-end socket communication test passed"
+        fi
+    fi
+    
+    if [[ "$validation_failed" == true ]]; then
+        log "ERROR" "Nginx-PHP socket validation failed - see errors above"
+        return 1
+    fi
+    
+    return 0
+}
+
 validate_nginx() {
     print_info "Validating Nginx installation..."
     log "INFO" "Validating Nginx service"
@@ -4233,7 +4315,7 @@ validate_php() {
     
     # Check PHP CLI
     if command -v php >/dev/null 2>&1; then
-        local php_version=$(php -r "echo PHP_VERSION;")
+        local php_version=$(php -r "echo PHP_VERSION;" 2>/dev/null)
         print_success "PHP CLI available"
         log "INFO" "PHP CLI validation: PASSED - PHP $php_version"
     else
@@ -4439,7 +4521,7 @@ validate_package_managers() {
         case "$package_manager" in
             composer)
                 if command -v composer >/dev/null 2>&1; then
-                    local composer_version=$(composer --version --no-ansi)
+                    local composer_version=$(composer --version --no-ansi 2>/dev/null)
                     print_success "Composer validation: PASSED - $composer_version"
                     log "INFO" "Composer validation: PASSED - $composer_version"
                 else
@@ -4522,9 +4604,8 @@ validate_development_tools() {
                 ;;
             claude-ai)
                 if command -v claude >/dev/null 2>&1; then
-                    local claude_version=$(claude --version 2>/dev/null | head -n 1 || echo "version detection failed")
-                    print_success "Claude AI Code validation: PASSED - $claude_version"
-                    log "INFO" "Claude AI Code validation: PASSED - $claude_version"
+                    print_success "Claude AI Code validation: PASSED - installed and available"
+                    log "INFO" "Claude AI Code validation: PASSED - installed and available"
                 else
                     print_error "Claude AI Code validation: FAILED"
                     log "ERROR" "Claude AI Code validation: FAILED"
@@ -4609,6 +4690,11 @@ run_validations() {
     else
         print_info "Skipping PHP validation (none selected)"
         log "INFO" "PHP validation skipped - none selected"
+    fi
+    
+    # Validate Nginx-PHP socket integration (only if both Nginx and PHP are installed)
+    if ! validate_nginx_php_sockets; then
+        validation_failed=true
     fi
     
     # Validate package managers
@@ -4702,63 +4788,6 @@ remove_installation() {
         fi
     fi
     
-    # Check for Claude AI Code early to avoid interruption during removal
-    if command -v claude >/dev/null 2>&1; then
-        echo ""
-        print_warning "Claude AI Code is currently installed and may be in use!"
-        echo ""
-        print_warning "Removing it while developing could break your session!"
-        echo ""
-        
-        # Check if Claude Code is actively running
-        local claude_running=false
-        if pgrep -f "claude" >/dev/null 2>&1; then
-            claude_running=true
-            print_warning "DETECTED: Claude AI Code processes are currently running!"
-            echo ""
-        fi
-        
-        echo -e "${BLUE}===========================================================================${NC}"
-        echo ""
-        
-        if [[ "$NON_INTERACTIVE" == "true" ]]; then
-            # In non-interactive mode, skip Claude removal for safety
-            REMOVE_CLAUDE=false
-            print_info "✅ Claude AI Code will be preserved (non-interactive mode - safety default)"
-            log "INFO" "Claude AI Code preservation auto-selected in non-interactive mode for safety"
-        else
-            read -p "   Do you want to remove Claude AI Code? (y/N): " -r
-            if [[ $REPLY =~ ^[Yy]$ ]]; then
-                # If Claude is running, require additional confirmation
-                if [[ "$claude_running" == true ]]; then
-                    echo ""
-                    print_warning "🚨 DANGER: Claude AI Code is actively running!"
-                    print_warning "Removing it now WILL break your current session!"
-                    echo ""
-                    read -p "   Are you ABSOLUTELY SURE you want to continue? (y/N): " -r
-                    echo ""
-                    echo -e "${BLUE}===========================================================================${NC}"
-                    echo ""
-                    if [[ $REPLY =~ ^[Yy]$ ]]; then
-                        REMOVE_CLAUDE=true
-                        print_info "⚠️  Claude AI Code will be removed (session will break!)"
-                    else
-                        REMOVE_CLAUDE=false
-                        print_info "✅ Claude AI Code removal cancelled - session preserved"
-                    fi
-                else
-                    REMOVE_CLAUDE=true
-                    print_info "Claude AI Code will be removed during the process"
-                fi
-            else
-                REMOVE_CLAUDE=false
-                print_info "✅ Claude AI Code will be preserved"
-            fi
-        fi
-    else
-        # Claude not installed, safe to proceed with normal removal
-        REMOVE_CLAUDE=true
-    fi
     
     print_info "Starting removal process..."
     log "COMPLETION" "Starting removal process"
@@ -4811,14 +4840,8 @@ remove_installation() {
     else
         echo "  • Final cleanup completed"
     fi
-    if [[ "$REMOVE_CLAUDE" == false ]]; then
-        echo "  • 100% of components removed except Claude AI Code and dependencies"
-        echo "  • Claude AI Code, Node.js, and npm remain installed and functional."
-        echo "  • To remove Claude AI Code later, run: npm uninstall -g @anthropic-ai/claude-code"
-    else
-        echo "  • All components have been removed from the system."
-        echo "  • The server has been restored to its original state."
-    fi
+    echo "  • All components have been removed from the system."
+    echo "  • The server has been restored to its original state."
     echo "  • Removal log saved to: $REMOVAL_LOG_FILE"
     echo ""
     echo -e "  🔄 ${WHITE}Important: To clear stale command references, run:${NC} ${BLUE}hash -r${NC}"
@@ -4827,13 +4850,8 @@ remove_installation() {
     echo ""
     
     log "COMPLETION" "Removal process completed successfully"
-    if [[ "$REMOVE_CLAUDE" == false ]]; then
-        log "COMPLETION" "All components removed except Claude AI Code and dependencies"
-        log "COMPLETION" "Claude AI Code, Node.js, and npm preserved by user choice"
-    else
-        log "COMPLETION" "All components removed from the system"
-        log "COMPLETION" "Server restored to original state"
-    fi
+    log "COMPLETION" "All components removed from the system"
+    log "COMPLETION" "Server restored to original state"
     
     
     exit 0
@@ -5218,31 +5236,26 @@ remove_package_managers() {
         log "INFO" "Composer removed from /usr/local/bin/composer"
     fi
     
-    # Remove Node.js and npm (unless Claude AI Code is preserved)
-    if [[ "$REMOVE_CLAUDE" == false ]]; then
-        print_info "✅ Preserving Node.js and npm (required by Claude AI Code)"
-        log "INFO" "Node.js and npm preserved for Claude AI Code"
-    else
-        case "$PACKAGE_MANAGER" in
-            dnf|yum)
-                print_info "Removing Node.js and npm via $PACKAGE_MANAGER..."
-                dnf remove -y nodejs npm 2>/dev/null || true
-                ;;
-            apt)
-                print_info "Removing Node.js and npm via $PACKAGE_MANAGER..."
-                apt-get remove -y nodejs npm 2>/dev/null || true
-                apt-get autoremove -y 2>/dev/null || true
-                ;;
-            zypper)
-                print_info "Removing Node.js and npm via $PACKAGE_MANAGER..."
-                zypper remove -y nodejs npm 2>/dev/null || true
-                ;;
-            pacman)
-                print_info "Removing Node.js and npm via $PACKAGE_MANAGER..."
-                pacman -Rns --noconfirm nodejs npm 2>/dev/null || true
-                ;;
-        esac
-    fi
+    # Remove Node.js and npm
+    case "$PACKAGE_MANAGER" in
+        dnf|yum)
+            print_info "Removing Node.js and npm via $PACKAGE_MANAGER..."
+            dnf remove -y nodejs npm 2>/dev/null || true
+            ;;
+        apt)
+            print_info "Removing Node.js and npm via $PACKAGE_MANAGER..."
+            apt-get remove -y nodejs npm 2>/dev/null || true
+            apt-get autoremove -y 2>/dev/null || true
+            ;;
+        zypper)
+            print_info "Removing Node.js and npm via $PACKAGE_MANAGER..."
+            zypper remove -y nodejs npm 2>/dev/null || true
+            ;;
+        pacman)
+            print_info "Removing Node.js and npm via $PACKAGE_MANAGER..."
+            pacman -Rns --noconfirm nodejs npm 2>/dev/null || true
+            ;;
+    esac
     
     # Clean up user-specific configuration directories
     print_info "Cleaning up package manager configuration..."
@@ -5253,25 +5266,21 @@ remove_package_managers() {
             print_info "Removing Composer config for $(basename "$user_home")"
             rm -rf "$user_home/.composer"
         fi
-        # Clean up npm global directories (unless Claude AI Code was installed)
-        if ! is_claude_ai_installed; then
-            if [[ -d "$user_home" && -d "$user_home/.npm-global" ]]; then
-                print_info "Removing npm global config for $(basename "$user_home")"
-                rm -rf "$user_home/.npm-global"
-            fi
-            # Remove npm cache
-            if [[ -d "$user_home" && -d "$user_home/.npm" ]]; then
-                print_info "Removing npm cache for $(basename "$user_home")"
-                rm -rf "$user_home/.npm"
-            fi
+        # Clean up npm global directories
+        if [[ -d "$user_home" && -d "$user_home/.npm-global" ]]; then
+            print_info "Removing npm global config for $(basename "$user_home")"
+            rm -rf "$user_home/.npm-global"
+        fi
+        # Remove npm cache
+        if [[ -d "$user_home" && -d "$user_home/.npm" ]]; then
+            print_info "Removing npm cache for $(basename "$user_home")"
+            rm -rf "$user_home/.npm"
         fi
     done
     
-    # Remove global npm cache (unless Claude AI Code is preserved)
-    if [[ "$REMOVE_CLAUDE" == true ]]; then
-        rm -rf /root/.npm 2>/dev/null || true
-        rm -rf /root/.npm-global 2>/dev/null || true
-    fi
+    # Remove global npm cache
+    rm -rf /root/.npm 2>/dev/null || true
+    rm -rf /root/.npm-global 2>/dev/null || true
     rm -rf /root/.composer 2>/dev/null || true
     
     print_success "Package managers removed"
@@ -5330,25 +5339,6 @@ remove_development_tools() {
             ;;
     esac
     
-    # Remove Claude AI Code (with safety prompt)
-    # Remove Claude AI Code if user confirmed at the beginning
-    if [[ "$REMOVE_CLAUDE" == true && $(command -v claude >/dev/null 2>&1; echo $?) -eq 0 ]]; then
-        if command -v npm >/dev/null 2>&1; then
-            print_info "Removing Claude AI Code via npm..."
-            npm uninstall -g @anthropic-ai/claude-code 2>/dev/null || true
-        fi
-        
-        # Also remove any manual installation
-        if [[ -f "/usr/local/bin/claude" ]]; then
-            print_info "Removing Claude AI Code binary..."
-            rm -f /usr/local/bin/claude 2>/dev/null || true
-        fi
-        print_success "Claude AI Code removed"
-        log "INFO" "Claude AI Code removed by user choice"
-    elif [[ "$REMOVE_CLAUDE" == false ]]; then
-        print_info "✅ Preserving Claude AI Code (as requested)"
-        log "INFO" "Claude AI Code preserved by user choice during removal"
-    fi
     
     # Clean up configuration files
     print_info "Cleaning up development tools configuration..."
@@ -5368,17 +5358,12 @@ remove_development_tools() {
             sudo -u "$username" git config --global --unset-all core.excludesfile 2>/dev/null || true
             # Remove GitHub CLI configuration
             rm -rf "$user_home/.config/gh" 2>/dev/null || true
-            # Remove Claude AI Code configuration
-            rm -rf "$user_home/.config/claude" 2>/dev/null || true
-            rm -f "$user_home/.claude-config" 2>/dev/null || true
         fi
     done
     
-    # Remove root Git, GitHub CLI, and Claude AI configuration
+    # Remove root Git and GitHub CLI configuration
     rm -rf /root/.config/gh 2>/dev/null || true
-    rm -rf /root/.config/claude 2>/dev/null || true
     rm -f /root/.gitconfig 2>/dev/null || true
-    rm -f /root/.claude-config 2>/dev/null || true
     
     print_success "Development tools removed"
     log "INFO" "Development tools removal completed"
@@ -6203,7 +6188,7 @@ main() {
                 case "$package_manager" in
                     composer)
                         if command -v composer >/dev/null 2>&1; then
-                            local composer_version=$(composer --version --no-ansi | head -n 1)
+                            local composer_version=$(composer --version --no-ansi 2>/dev/null | head -n 1)
                             echo "  • Composer: $composer_version"
                             log "COMPLETION" "Composer status: $composer_version"
                         else
@@ -6257,9 +6242,8 @@ main() {
                         ;;
                     claude-ai)
                         if command -v claude >/dev/null 2>&1; then
-                            local claude_version=$(claude --version 2>/dev/null | head -n 1 || echo "version detection failed")
-                            echo "  • Claude AI Code: $claude_version"
-                            log "COMPLETION" "Claude AI Code status: $claude_version"
+                            echo "  • Claude AI Code: installed and available"
+                            log "COMPLETION" "Claude AI Code status: installed and available"
                         else
                             echo "  • Claude AI Code: Not available"
                             log "COMPLETION" "Claude AI Code status: Not available"
@@ -6304,11 +6288,18 @@ main() {
             done
         fi
         
-        # Multiple PHP versions information
-        if [[ "${SELECTED_PHP_VERSIONS[0]}" != "none" && ${#SELECTED_PHP_VERSIONS[@]} -gt 1 && "$PACKAGE_MANAGER" =~ ^(dnf|yum)$ ]]; then
-            echo "  • Multiple PHP versions installed: ${SELECTED_PHP_VERSIONS[*]}"
-            echo "  • Access specific versions: /opt/remi/php82/root/usr/bin/php, /opt/remi/php83/root/usr/bin/php, etc."
-            echo "  • Default PHP version: ${SELECTED_PHP_VERSIONS[0]} (accessible via 'php' command)"
+        # PHP versions location information
+        if [[ "${SELECTED_PHP_VERSIONS[0]}" != "none" && "$PACKAGE_MANAGER" =~ ^(dnf|yum)$ ]]; then
+            # Show individual PHP version locations for RHEL-based systems
+            for version in "${SELECTED_PHP_VERSIONS[@]}"; do
+                local version_nodot="${version//./}"
+                echo "  • PHP location: /opt/remi/php$version_nodot/root/usr/bin/php"
+            done
+            
+            # Show default version info if multiple versions are installed
+            if [[ ${#SELECTED_PHP_VERSIONS[@]} -gt 1 ]]; then
+                echo "  • Default PHP version: ${SELECTED_PHP_VERSIONS[0]} (accessible via 'php' command)"
+            fi
         fi
         
         if [[ "$SELECTED_WEBSERVER" == "nginx" ]]; then

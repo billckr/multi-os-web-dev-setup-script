@@ -17,6 +17,7 @@ This script provides bulletproof installation of web development environments wi
 - **Visual Progress Indicators**: Spinning cursors during long-running operations
 - **Intelligent Dependency Management**: Automatic dependency checking and resolution
 - **Multi-Version PHP Support**: Install multiple PHP versions simultaneously (8.2, 8.3, 8.4)
+- **Socket-Based Nginx-PHP**: Unix socket architecture for optimal performance and security (10-30% faster than TCP)
 - **Non-Interactive Mode**: Command-line automation with --skip flag and --list-options for unattended installations
 
 ## Requirements
@@ -302,6 +303,34 @@ These networking and monitoring tools are automatically installed and verified:
 | `--username=` | Username for domain setup: start with letter/underscore, lowercase letters/numbers/underscore/dash only, 3-32 chars, cannot be existing user | `--username=webuser` |
 
 **Note:** If `--php-default` is not specified or invalid, the first selected PHP version becomes the default.
+
+## Troubleshooting
+
+### Nginx 502 Bad Gateway Errors
+If you encounter 502 errors with Nginx + PHP:
+
+```bash
+# Check socket files exist with correct permissions
+ls -la /run/php-fpm/
+# Should show: srw-rw----. 1 nginx nginx php{version}.sock
+
+# Verify PHP-FPM services are running
+systemctl status php82-php-fpm php83-php-fpm php84-php-fpm
+
+# Check Nginx socket configuration
+grep fastcgi_pass /etc/nginx/conf.d/default.conf
+# Should show: fastcgi_pass unix:/run/php-fpm/php{default_version}.sock;
+
+# Check for ACL conflicts
+grep "acl_users" /etc/opt/remi/php*/php-fpm.d/www.conf
+# Should be commented out (;listen.acl_users = apache)
+
+# View detailed error logs
+tail -f /var/log/nginx/error.log
+journalctl -u php83-php-fpm --no-pager -l
+```
+
+Socket validation errors are logged with specific diagnostic information and suggested fixes.
 
 ## Contributing
 

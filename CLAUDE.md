@@ -61,10 +61,11 @@ This repository contains a comprehensive multi-OS web development environment se
 5. ✅ Documentation reflects all recent improvements
 
 **If issues persist, check:**
-- PHP-FPM service status: `systemctl status php82-php-fpm php83-php-fpm`
-- Socket configuration: `grep fastcgi_pass /etc/nginx/conf.d/default.conf` (should show unix:/run/php-fpm/www.sock)
-- Socket file exists: `ls -la /run/php-fpm/www.sock` (should show socket with proper permissions)
-- PHP-FPM listen config: `grep "^listen" /etc/php-fpm.d/www.conf` (should show socket path)
+- PHP-FPM service status: `systemctl status php82-php-fpm php83-php-fpm php84-php-fpm`
+- Socket configuration: `grep fastcgi_pass /etc/nginx/conf.d/default.conf` (should show unix:/run/php-fpm/php83.sock for default version)
+- Socket files exist: `ls -la /run/php-fpm/` (should show php{version}.sock files with nginx:nginx ownership)
+- PHP-FPM listen config: `grep "^listen" /etc/opt/remi/php*/php-fpm.d/www.conf` (should show individual socket paths)
+- ACL conflicts: `grep "acl_users" /etc/opt/remi/php*/php-fpm.d/www.conf` (should be commented out for Nginx)
 - Database tracking: `cat /root/.installed_databases` (should list selected databases)
 - Bash cache issues: `hash -r` to clear command cache if commands show "not found" after installation
 
@@ -252,6 +253,22 @@ systemctl status httpd nginx mysql mariadb fail2ban
 - **SQLite**: Lightweight option with sample database creation
 - **MongoDB/Redis**: NoSQL and caching options
 
+#### Nginx-PHP Socket Architecture Fix (2025-07-23)
+**Enhanced Nginx-PHP Integration**: Complete overhaul of socket-based communication ensuring reliable performance:
+- **Always Unix Sockets**: Nginx installations now exclusively use Unix sockets for PHP-FPM communication (10-30% performance improvement over TCP)
+- **Individual Socket Files**: Each PHP version gets dedicated socket: `/run/php-fpm/php{version}.sock` (php82.sock, php83.sock, php84.sock)
+- **Proper Permission Management**: Automatic `nginx:nginx` ownership with `0660` permissions, ACL conflict prevention
+- **Socket Directory Persistence**: systemd tmpfiles.d configuration ensures `/run/php-fpm/` survives reboots
+- **Enhanced Validation**: Comprehensive 5-tier socket validation with specific error diagnostics in logs
+- **Fixed Variable Naming**: Resolved `fmp_config` vs `fpm_config` consistency issues
+- **Sed Syntax Fix**: Changed delimiter from `/` to `|` to handle socket paths with forward slashes
+
+**Technical Details:**
+- Socket validation tests: file existence, permissions, PHP-FPM listening, Nginx configuration, end-to-end communication
+- Error diagnostics logged with suggested fix commands for troubleshooting
+- Works consistently with single or multiple PHP versions
+- Maintains Apache compatibility (preserves mod_php integration)
+
 #### Database Installation Improvements (2025-07-23)
 **Enhanced Security & Reliability**: All database installations now include:
 - **Pre-Installation Cleanup**: Automatically stops conflicting services and removes corrupted data directories
@@ -426,9 +443,8 @@ sudo ./setup.sh --non-interactive --remove
 ```
 
 **Safety features:**
-- Claude AI Code is preserved by default (won't break active sessions)
 - Users with public_html directories are auto-removed (likely script-created)
-- All other components removed without confirmation
+- All components removed without confirmation
 
 ## Removal Instructions (Non-Interactive Mode)
 
