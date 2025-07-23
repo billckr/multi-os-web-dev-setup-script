@@ -4254,6 +4254,7 @@ remove_installation() {
         if pgrep -f "claude" >/dev/null 2>&1; then
             claude_running=true
             print_warning "DETECTED: Claude AI Code processes are currently running!"
+            echo ""
         fi
         
         if [[ "$NON_INTERACTIVE" == "true" ]]; then
